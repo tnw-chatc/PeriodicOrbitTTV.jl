@@ -115,3 +115,26 @@ function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: 
     end
     return elems
 end
+
+function get_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: AbstractFloat
+    anoms = Vector{T}[]
+    μs = get_relative_masses(ic)
+    X, V = get_relative_positions(s.x, s.v, ic)
+    X = point2vector.(X)
+    V = point2vector.(V)
+    i = 1; b = 0
+    while i < ic.nbody
+        if first(ic.ϵ[i, :]) == zero(T)
+            b += 1
+        end
+        a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[i+b], V[i+b], μs[i+b], s.t[1])
+        push!(anoms, [f, M, E])
+        if b > 0
+            b -= 2
+        elseif b < 0
+            i += 1
+        end
+        i += 1
+    end
+    return anoms
+end
