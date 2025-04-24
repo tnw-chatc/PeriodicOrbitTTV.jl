@@ -1,6 +1,6 @@
 using NbodyGradient: State, Elements, ElementsIC, InitialConditions
 
-function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int64, h=0.5) where T <: AbstractFloat
+function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int64, h=10.) where T <: AbstractFloat
     times = Float64[s.t[1]]
     Ms = Float64[get_anomalies(s, ic)[index][2]]
     intr = Integrator(ahl21!, h, h)
@@ -19,13 +19,13 @@ function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int6
         push!(times, s.t[1])   
         
         if M - Ms[begin] >= target
-            target_time = bisection(ic, times[end-1], times[end], index)
+            target_time = bisection(ic, times[end-1], times[end], index, Ms[begin])
             return target_time, times, Ms
         end
     end    
 end
 
-function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64; h=1.0, tol=1e-9, doomthres=100000,)
+function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64, offset::Float64; h=1.0, tol=1e-9, doomthres=100000,)
     doom = 0
     while doom < doomthres
         half = (a + b)/2
@@ -33,17 +33,17 @@ function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64; h=1.0, 
         sa = State(ic)
         intr = Integrator(ahl21!, h, a)
         intr(sa)
-        fa = sin(get_anomalies(sa, ic)[index][2])
+        fa = sin(get_anomalies(sa, ic)[index][2] - offset)
 
         sb = State(ic)
         intr = Integrator(ahl21!, h, b)
         intr(sb)
-        fb = sin(get_anomalies(sb, ic)[index][2])
+        fb = sin(get_anomalies(sb, ic)[index][2] - offset)
 
         shalf = State(ic)
         intr = Integrator(ahl21!, h, half)
         intr(shalf)
-        fhalf = sin(get_anomalies(shalf, ic)[index][2])
+        fhalf = sin(get_anomalies(shalf, ic)[index][2] - offset)
 
         if fhalf > 0
             a = a
