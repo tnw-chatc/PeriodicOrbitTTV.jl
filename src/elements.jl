@@ -21,7 +21,6 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     # (2.129) h = r × v
     hvec = cross(x, v)
     h = mag(hvec)
-    # rdot = sign(dot(x,v))*Rdotmag(r,vmag,h) # Time derivative of radial distance
     # Specific orbital energy (2.28): ε = v^2/2 - Gm/r
     ε = 0.5 * v2 - Gm / r
     # (2.134) a = [2/r - v^2 / Gm]^-1
@@ -40,9 +39,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     I = acos(clamp(hz / h, -1, 1))
     # (2.132-2.133) Ω from hvec
     Ω = I > 1e-8 ? atan(hx, -hy) : 0.0
-    # evec = (cross(v, hvec) .- (x .* (Gm / r))) .* (1 / Gm)
     evec = (cross(v, hvec) / Gm) .- (x / r)
-    # evec = Point((unpack(cross(v, hvec)) .- [x.x * Gm / r, x.y * Gm / r, x.z * Gm / r]) .* (1 / Gm))
     ω = 0.0
     if I > 1e-8
         nvec = [-hy, hx, 0.0]
@@ -84,11 +81,11 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
         a=a,
         e=e,
         I=I,
-        Ω=Ω % (2π),
+        Ω=mod2pi(Ω),
         ω=mod2pi(ω),
-        f=f % (2π),
-        M=M % (2π),
-        E=E,
+        f=mod2pi(f),
+        M=mod2pi(M),
+        E=mod2pi(E),
         τ=τ,
         n=n,
         h=h
