@@ -1,0 +1,16 @@
+name = "PeriodicOrbit"
+uuid = "39b8e391-62ca-4e8a-af42-0d151c329bad"
+authors = ["Tanawan Chatchadanoraset <tchatc24@uw.edu>"]
+version = "0.1.0"
+
+[deps]
+Debugger = "31a5f54b-26ea-5ae9-a837-f05ce5417438"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NbodyGradient = "69f646f0-5709-4f35-9e52-1656edff0883"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+Debugger = "0.7.11"
+LinearAlgebra = "1.11.0"
+NbodyGradient = "0.2.1"
+Test = "1.11.0"
