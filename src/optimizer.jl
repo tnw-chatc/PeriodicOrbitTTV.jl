@@ -55,7 +55,7 @@ function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64, offset:
             b = b
         end
 
-        println("$a, $half, $b, $fa, $fhalf, $fb")
+        # println("$a, $half, $b, $fa, $fhalf, $fb")
 
         if abs(fa-fb) < tol || fhalf == 0.0
             return half
