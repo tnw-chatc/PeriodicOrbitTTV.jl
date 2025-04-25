@@ -9,7 +9,7 @@ export Orbit
 
 export convert_to_elements, get_orbital_elements, get_anomalies
 export integrate_to_M!
-export optimize!
+export optimize!, init_from_M!
 
 
 include("elements.jl")

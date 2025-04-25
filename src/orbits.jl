@@ -1,4 +1,4 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions, kepler
 using Rotations
 
 mutable struct Orbit{T<:AbstractFloat}
@@ -31,4 +31,14 @@ Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     println("Orbit")
     println("Current time: $(o.s.t)")
     return
+end
+
+"""Initializes a planet using mean anomaly"""
+function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T <: AbstractFloat
+    r = s.x
+
+    elems = get_orbital_elements(s, ic)[index]
+
+    E = kepler(M, elems.e)
+    return E
 end
