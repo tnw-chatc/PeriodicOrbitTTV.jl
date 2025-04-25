@@ -35,10 +35,24 @@ end
 
 """Initializes a planet using mean anomaly"""
 function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T <: AbstractFloat
-    r = s.x
-
     elems = get_orbital_elements(s, ic)[index]
+    e = elems.e
+    a = elems.a
+    Ω = elems.Ω
+    I = elems.I
+    ω = elems.ω
 
-    E = kepler(M, elems.e)
-    return E
+    f = kepler(M, e)
+
+    rmag = a * (1 - e^2) / (1 + e * cos(f))
+    rplane = [rmag * cos(f), rmag * sin(f), 0]
+
+    P1 = [cos(ω) -sin(ω) 0.0; sin(ω) cos(ω) 0.0; 0.0 0.0 1.0]
+    P2 = [1.0 0.0 0.0; 0.0 cos(I) -sin(I); 0.0 sin(I) cos(I)]
+    P3 = [cos(Ω) -sin(Ω) 0.0; sin(Ω) cos(Ω) 0.0; 0.0 0.0 1.0]
+    P321 = P3*P2*P1
+
+    r_new = P321 * rplane
+
+    s.x[:,index] .= r_new
 end
