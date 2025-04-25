@@ -1,4 +1,5 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions, kepler
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions
+using NbodyGradient: kepler, ekepler
 using Rotations
 
 mutable struct Orbit{T<:AbstractFloat}
@@ -41,11 +42,14 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     Ω = elems.Ω
     I = elems.I
     ω = elems.ω
+    n = 2π / elems.P
 
     f = kepler(M, e)
+    E = ekepler(M, e)
 
     rmag = a * (1 - e^2) / (1 + e * cos(f))
     rplane = [rmag * cos(f), rmag * sin(f), 0]
+    vplane = [-n * a^2 * sin(E) / rmag, n * a^2 * sqrt(1-e^2) * cos(E) / rmag, 0]
 
     P1 = [cos(ω) -sin(ω) 0.0; sin(ω) cos(ω) 0.0; 0.0 0.0 1.0]
     P2 = [1.0 0.0 0.0; 0.0 cos(I) -sin(I); 0.0 sin(I) cos(I)]
@@ -53,6 +57,8 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     P321 = P3*P2*P1
 
     r_new = P321 * rplane
+    v_new = P321 * vplane
 
     s.x[:,index] .= r_new
+    s.v[:,index] .= v_new
 end
