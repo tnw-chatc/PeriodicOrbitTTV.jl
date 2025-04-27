@@ -30,7 +30,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
         e = 1.0
     else
         a = -Gm / (2ε)
-        # (2.135) e = sqrt(1 - h^2 / (Gm * a))
+        # e = sqrt(1 - h^2 / (Gm * a)) # (2.135) 
         e = sqrt(1.0 + 2ε * h^2 / Gm^2)
     end
     # (2.131) inclination I = arccos(hz / h)
