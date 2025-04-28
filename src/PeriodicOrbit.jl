@@ -11,6 +11,10 @@ export convert_to_elements, get_orbital_elements, get_anomalies
 export integrate_to_M!
 export optimize!, init_from_M!
 
+# For debugging
+export normvec
+export mag
+
 
 include("elements.jl")
 include("optimizer.jl")

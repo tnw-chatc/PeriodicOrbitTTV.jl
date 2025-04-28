@@ -15,7 +15,7 @@ end
 function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <: AbstractFloat
     # (2.126) R^2 = x^2 + y^2 + z^2
     r = mag(x)
-   # (2.127) V^2 = vx^2 + vy^2 + vz^2
+    # (2.127) V^2 = vx^2 + vy^2 + vz^2
     v2 = dot(v, v)
     vmag = mag(v) # Magnitude of velocity
     # (2.129) h = r × v
@@ -90,6 +90,18 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
         n=n,
         h=h
     )
+end
+
+function normvec(x::Vector{T}, v::Vector{T}, Gm::T) where T <: AbstractFloat
+    # TODO: Need more comprehensive testing
+    r = mag(x)
+    hvec = cross(x, v)
+    evec = (cross(v, hvec) / Gm) .- (x / r)
+
+    # Unnormalized normal vector
+    nvec = cross(evec, x)
+
+    return nvec
 end
 
 function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: AbstractFloat
