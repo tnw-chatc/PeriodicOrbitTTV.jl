@@ -21,8 +21,46 @@ mutable struct Orbit{T<:AbstractFloat}
     end
 end
 
-function optimize!(orbit::Orbit, target::T) where T <: AbstractFloat
-    target_time, times, Ms = integrate_to_M!(orbit.s, orbit.ic, target, 1);
+@kwdef mutable struct OptimParameters{T<:AbstractFloat}
+    e1::T
+    e2::T
+    M::T
+    Δω::T
+end
+
+@kwdef struct OrbitParameters{T<:AbstractFloat}
+    # TODO: Implement this in a better way somehow
+    m1::T
+    m2::T 
+    κ::T 
+end
+
+"""
+Alternative constructor for `Orbit` object
+
+Takes the number of planets, `OptimParameters` object and (for now) `κ`
+"""
+Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = begin
+    p1 = Elements(m=1)
+    p2 = Elements(m=1e-4, P=365.242, e=optparams.e1, ω=0,)
+    p3 = Elements(m=1e-4, P=κ*365.242, e=optparams.e2, ω=optparams.Δω,)
+
+    ic = ElementsIC(0., N+1, p1, p2, p3)
+    s = State(ic)
+
+    orbit = Orbit(s, ic, κ)
+
+    # TODO: Implement mean anomaly initialization
+    # init_from_M!(o.s, o.ic, optparams.M, 2)
+    # init_from_M!(o.s, o.ic, optparams.M, 3)
+
+    orbit
+end
+
+function optimize!(orbit::Orbit)
+    # Target mean anomaly for two planet system is 4π
+    target_M = 4π
+    target_time, times, Ms = integrate_to_M!(orbit.s, orbit.ic, target_M, 1);
 
     orbit.s = State(orbit.ic)
     intr = Integrator(0.5, 0., target_time)
@@ -40,6 +78,7 @@ end
 """Initializes a planet using mean anomaly"""
 function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T <: AbstractFloat
     # TODO: Also implement a version taking an array of M instead of an individual index
+    # TODO: Fix the accuracy issue
 
     elems = get_orbital_elements(s, ic)[index]
     e = elems.e
