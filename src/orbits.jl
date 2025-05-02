@@ -18,12 +18,22 @@ mutable struct Orbit{T<:AbstractFloat}
     end
 end
 
-@kwdef mutable struct OptimParameters{T<:AbstractFloat}
+@kwdef struct OptimParameters{T<:AbstractFloat}
     e1::T
     e2::T
     M::T
     Δω::T
 end
+
+# Implementing broadcastable subtraction
+Base.:-(x::OptimParameters{T}, y::OptimParameters{T}) where T = OptimParameters(
+    x.e1 - y.e1,
+    x.e1 - y.e1,
+    x.M - y.M,
+    x.Δω - y.Δω,
+)
+
+Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
 @kwdef struct OrbitParameters{T<:AbstractFloat}
     # TODO: Implement this in a better way somehow
@@ -54,7 +64,7 @@ Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = b
     Orbit(s, ic, κ)
 end
 
-function optimize!(orbit::Orbit)
+function optimize!(optimparams::OptimParameters{T}, orbit::Orbit) where T <: AbstractFloat
     # Target mean anomaly for two planet system is 4π
     target_M = 4π
     target_time, times, Ms = integrate_to_M!(orbit.s, orbit.ic, target_M, 1);
@@ -63,7 +73,17 @@ function optimize!(orbit::Orbit)
     intr = Integrator(0.5, 0., target_time)
     intr(orbit.s)
 
-    # TODO: Implement the actual optimization
+    # TODO: Implement the actual optimization for N-body system (currently only for 2 planets)
+    final_e1 = get_orbital_elements(orbit.s, orbit.ic)[2].e
+    final_e2 = get_orbital_elements(orbit.s, orbit.ic)[3].e
+    final_M = get_anomalies(orbit.s, orbit.ic)[1][2]
+    final_Δω = get_orbital_elements(orbit.s, orbit.ic)[3].ω - get_orbital_elements(orbit.s, orbit.ic)[2].ω
+
+    final_optparams = OptimParameters(final_e1, final_e2, final_M, final_Δω)
+
+    diff = final_optparams .- optimparams
+
+    return diff
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
