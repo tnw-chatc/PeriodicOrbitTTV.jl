@@ -111,3 +111,22 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     s.x[:,index] .= r_new
     s.v[:,index] .= v_new
 end
+
+"""Calculates t0 offset to correct initialization"""
+function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
+
+    # Offsetting ω
+    ω += π/2
+
+    # Eccentric anomaly
+    E = 2 * atan( sqrt((1 - e) / (1 + e)) * tan(ω / 2) )
+
+    # Mean anomaly
+    M = E - e * sin(E)
+
+    # Time since periastron passage
+    tp = P * (M + target_M) / 2π
+
+    # Negates the time since we want to reverse it
+    return -tp
+end
