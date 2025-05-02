@@ -10,12 +10,8 @@ mutable struct Orbit{T<:AbstractFloat}
     nplanet::Int
 
     function Orbit(s::State, ic::InitialConditions, κ::T) where T <: AbstractFloat
-        # Rotation object to make initialization starts on x-axis
-        # TODO: rotate about normal vector instead of the z-axis
-        rotmat = RotXYZ(0,0,π/2)
-        s.x .= rotmat * s.x
-        s.v .= rotmat * s.v
 
+        # Gets the number of planets
         nplanet = ic.nbody - 1
     
         new{T}(s, ic, κ, nplanet)
@@ -42,9 +38,15 @@ Alternative constructor for `Orbit` object
 Takes the number of planets, `OptimParameters` object and (for now) `κ`
 """
 Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = begin
+    ONE_YEAR = 365.242
+
+    # t0 corrections for initialization
+    t0_init_1 = M2t0(0., optparams.e1, ONE_YEAR, 0.)
+    t0_init_2 = M2t0(optparams.M, optparams.e2, κ*ONE_YEAR, optparams.Δω)
+
     p1 = Elements(m=1)
-    p2 = Elements(m=1e-4, P=365.242, e=optparams.e1, ω=0,)
-    p3 = Elements(m=1e-4, P=κ*365.242, e=optparams.e2, ω=optparams.Δω,)
+    p2 = Elements(m=1e-4, P=ONE_YEAR, e=optparams.e1, ω=0, t0=t0_init_1)
+    p3 = Elements(m=1e-4, P=κ*ONE_YEAR, e=optparams.e2, ω=optparams.Δω, t0=t0_init_2)
 
     ic = ElementsIC(0., N+1, p1, p2, p3)
     s = State(ic)
