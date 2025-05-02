@@ -9,7 +9,7 @@ export Orbit, OptimParameters
 
 export convert_to_elements, get_orbital_elements, get_anomalies
 export integrate_to_M!
-export optimize!, init_from_M!
+export optimize!
 
 # For debugging
 export normvec
