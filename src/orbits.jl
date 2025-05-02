@@ -1,6 +1,7 @@
 using NbodyGradient: State, Elements, ElementsIC, InitialConditions
 using NbodyGradient: kepler, ekepler
 using Rotations
+using LinearAlgebra: dot
 
 mutable struct Orbit{T<:AbstractFloat}
     s::State
@@ -93,6 +94,7 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     E = ekepler(M, e)
 
     # Rotates x and v on the plane to the true frame.
+    # TODO: Handle the relative positive correctly. Might use t0 instead when initializing
     rmag = a * (1 - e^2) / (1 + e * cos(f))
     rplane = [rmag * cos(f), rmag * sin(f), 0]
     vplane = [-n * a^2 * sin(E) / rmag, n * a^2 * sqrt(1-e^2) * cos(E) / rmag, 0]
