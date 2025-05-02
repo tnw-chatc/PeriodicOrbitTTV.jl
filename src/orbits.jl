@@ -69,8 +69,10 @@ Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = b
     Orbit(s, ic, κ)
 end
 
-function optimize!(optimparams::OptimParameters{T}, orbit::Orbit) where T <: AbstractFloat
+function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
     # Target mean anomaly for two planet system is 4π
+    orbit = Orbit(2, optparams, 2.00)
+
     target_M = 4π
     target_time, times, Ms = integrate_to_M!(orbit.s, orbit.ic, target_M, 1);
 
@@ -87,8 +89,9 @@ function optimize!(optimparams::OptimParameters{T}, orbit::Orbit) where T <: Abs
 
     final_optparams = OptimParameters(final_e1, final_e2, final_M, final_Δω)
 
-    diff = tovector(final_optparams .- optimparams)
+    diff = tovector(final_optparams .- optparams)
 
+    println(sum(diff.^2))
     return sum(diff.^2)
 end
 
