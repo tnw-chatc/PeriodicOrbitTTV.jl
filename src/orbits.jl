@@ -51,13 +51,7 @@ Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = b
     ic = ElementsIC(0., N+1, p1, p2, p3)
     s = State(ic)
 
-    orbit = Orbit(s, ic, κ)
-
-    # TODO: Implement mean anomaly initialization
-    # init_from_M!(o.s, o.ic, optparams.M, 2)
-    # init_from_M!(o.s, o.ic, optparams.M, 3)
-
-    orbit
+    Orbit(s, ic, κ)
 end
 
 function optimize!(orbit::Orbit)
@@ -81,8 +75,6 @@ end
 """Initializes a planet using mean anomaly"""
 function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T <: AbstractFloat
     # TODO: Also implement a version taking an array of M instead of an individual index
-    # TODO: Fix the accuracy issue
-
     elems = get_orbital_elements(s, ic)[index]
     e = elems.e
     a = elems.a
@@ -96,7 +88,6 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     E = ekepler(M, e)
 
     # Rotates x and v on the plane to the true frame.
-    # TODO: Handle the relative positive correctly. Might use t0 instead when initializing
     rmag = a * (1 - e^2) / (1 + e * cos(f))
     rplane = [rmag * cos(f), rmag * sin(f), 0]
     vplane = [-n * a^2 * sin(E) / rmag, n * a^2 * sqrt(1-e^2) * cos(E) / rmag, 0]
@@ -114,7 +105,7 @@ function init_from_M!(s::State, ic::InitialConditions, M::T, index::Int) where T
     s.v[:,index] .= v_new
 end
 
-"""Calculates t0 offset to correct initialization"""
+"""Calculates t0 offset to correct initialization on the x-axis"""
 function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
 
     # Offsetting ω
