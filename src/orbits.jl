@@ -87,11 +87,18 @@ function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
     final_M = get_anomalies(orbit.s, orbit.ic)[1][2]
     final_Δω = get_orbital_elements(orbit.s, orbit.ic)[3].ω - get_orbital_elements(orbit.s, orbit.ic)[2].ω
 
-    final_optparams = OptimParameters(final_e1, final_e2, final_M, final_Δω)
+    final_optparams = [final_e1, final_e2, rem2pi(final_M, RoundNearest), final_Δω]
 
-    diff = tovector(final_optparams .- optparams)
+    # Init params
+    init_optparams = tovector(optparams)
+    
+    # Wrap angles
+    init_optparams[3] = rem2pi(init_optparams[3], RoundNearest)
 
-    println(sum(diff.^2))
+    # diff = tovector(final_optparams .- optparams)
+    diff = final_optparams .- init_optparams
+
+    println("$(sum(diff.^2)); $(final_optparams); $(init_optparams)")
     return sum(diff.^2)
 end
 
