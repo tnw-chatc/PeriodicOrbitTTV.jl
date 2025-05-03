@@ -1,6 +1,6 @@
 using NbodyGradient: State, Elements, ElementsIC, InitialConditions
 
-function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int64, h=10.) where T <: AbstractFloat
+function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int64, h=30.) where T <: AbstractFloat
     times = Float64[s.t[1]]
     Ms = Float64[get_anomalies(s, ic)[index][2]]
     intr = Integrator(ahl21!, h, h)
@@ -25,7 +25,7 @@ function integrate_to_M!(s::State, ic::InitialConditions, target::T, index::Int6
     end    
 end
 
-function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64, offset::Float64; h=1.0, tol=1e-9, doomthres=100000,)
+function bisection(ic::ElementsIC, a::Float64, b::Float64, index::Int64, offset::Float64; h=10.0, tol=1e-9, doomthres=100000,)
     doom = 0
     while doom < doomthres
         half = (a + b)/2
