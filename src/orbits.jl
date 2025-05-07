@@ -28,6 +28,12 @@ end
 
 """Constructor for optimization parameters."""
 function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
+    if N == 2
+        OptimParameters(vec[1:2], vec[3], vec[4], nothing)
+    elseif N == 1
+        error("N must be greater than 1!")
+    end
+
     @assert length(vec) == 4*N - 4 "The vector is inconsistent with N!"
 
     e = vec[1:N]
