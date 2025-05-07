@@ -30,14 +30,6 @@ function tovector(x::OptimParameters)
     return [getfield(x, field) for field in fieldnames(typeof(x))]
 end
 
-# Implementing broadcastable subtraction
-Base.:-(x::OptimParameters{T}, y::OptimParameters{T}) where T = OptimParameters(
-    x.e1 - y.e1,
-    x.e1 - y.e1,
-    x.M - y.M,
-    x.Δω - y.Δω,
-)
-
 Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
 @kwdef struct OrbitParameters{T<:AbstractFloat}
@@ -96,11 +88,8 @@ function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
     init_optparams[3] = rem2pi(init_optparams[3], RoundNearest)
     init_optparams[4] = rem2pi(init_optparams[4], RoundNearest)
 
-    # diff = tovector(final_optparams .- optparams)
     diff = final_optparams .- init_optparams
 
-    # println("$(sum(diff.^2))")
-    # println("$(final_optparams); $(init_optparams)")
     return sum(diff.^2)
 end
 
@@ -112,7 +101,6 @@ end
 
 """Calculates t0 offset to correct initialization on the x-axis"""
 function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
-
     # Offsetting ω
     ω += π/2
 
