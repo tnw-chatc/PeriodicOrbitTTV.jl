@@ -18,11 +18,24 @@ mutable struct Orbit{T<:AbstractFloat}
     end
 end
 
+"""Vectorized optimization parameters."""
 @kwdef struct OptimParameters{T<:AbstractFloat}
-    e1::T
-    e2::T
-    M::T
-    Δω::T
+    e::Vector{T}
+    M::Vector{T}
+    Δω::Vector{T}
+    Pratio::Vector{T}
+end
+
+"""Constructor for optimization parameters."""
+function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
+    @assert length(vec) == 4*N - 4 "The vector is inconsistent with N!"
+
+    e = vec[1:N]
+    M = vec[N+1:2N-1]
+    Δω = vec[2N:3N-2]
+    Pratio = vec[3N-1:end]
+
+    OptimParameters(e, M, Δω, Pratio)
 end
 
 # Converts OptimParameters to a vector
