@@ -26,9 +26,7 @@ end
 end
 
 # Converts OptimParameters to a vector
-function tovector(x::OptimParameters)
-    return [getfield(x, field) for field in fieldnames(typeof(x))]
-end
+tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeof(x))]
 
 Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
