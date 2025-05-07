@@ -59,18 +59,42 @@ Alternative constructor for `Orbit` object
 
 Takes the number of planets, `OptimParameters` object and (for now) `κ`
 """
-Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = begin
+Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
     ONE_YEAR = 365.242
 
-    # t0 corrections for initialization
-    t0_init_1 = M2t0(0., optparams.e1, ONE_YEAR, 0.)
-    t0_init_2 = M2t0(optparams.M, optparams.e2, κ*ONE_YEAR, optparams.Δω)
+    # Initializes array for t0_init
+    t0_init = Vector{T}(undef, n)
+    periods = Vector{T}(undef, n)
+    omegas = Vector{T}(undef, n)
+    planets = Vector{Elements}(undef, n)
+    κ = orbparams.κ
 
-    p1 = Elements(m=1)
-    p2 = Elements(m=1e-4, P=ONE_YEAR, e=optparams.e1, ω=0, I=π/2, t0=t0_init_1)
-    p3 = Elements(m=1e-4, P=κ*ONE_YEAR, e=optparams.e2, ω=optparams.Δω, I=π/2, t0=t0_init_2)
+    # Calculates periods
+    # TODO: Properly calculates period based on Gozdziewski
+    periods = [(κ^i) * ONE_YEAR for i in 1:n]
 
-    ic = ElementsIC(0., N+1, p1, p2, p3)
+    # Fills in missing M
+    mean_anoms = vcat(0.0, optparams.M)
+
+    # Calculates the actual ω's from Δω
+    omegas[1] = 0.
+    for i = 2:n
+        omegas[i] = optparams.Δω[i-1] + omegas[i-1]
+    end
+
+    # Calculates t0 for initialization
+    for i = 1:n
+        t0_init[i] = M2t0(mean_anoms[i], optparams.e[i], periods[i], omegas[i])
+    end
+
+    # Primary object
+    star = Elements(m=1.)
+
+    for i = 1:n 
+        planets[i] = Elements(m=orbparams.mass[i], P=periods[i], e=optparams.e[i], ω=omegas[i], I=π/2, t0=t0_init[i])
+    end
+
+    ic = ElementsIC(0., n+1, star, planets...)
     s = State(ic)
 
     Orbit(s, ic, κ)

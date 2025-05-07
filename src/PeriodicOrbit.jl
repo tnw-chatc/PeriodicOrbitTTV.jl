@@ -5,7 +5,7 @@ using Rotations
 using LinearAlgebra
 using NbodyGradient
 
-export Orbit, OptimParameters
+export Orbit, OptimParameters, OrbitParameters
 
 export convert_to_elements, get_orbital_elements, get_anomalies
 export integrate_to_M!
