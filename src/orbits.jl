@@ -44,9 +44,7 @@ tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeo
 Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
 @kwdef struct OrbitParameters{T<:AbstractFloat}
-    # TODO: Implement this in a better way somehow
-    m1::T
-    m2::T 
+    mass::Vector{T}
     κ::T 
 end
 
