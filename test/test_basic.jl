@@ -50,6 +50,25 @@ end
     end
 end
 
+@testset "Orbit Initialization" begin
+    # For n = 4 planets
+    vec = [0.1, 0.2, 0.3, 0.4,
+    0., 1.3, 5.0,
+    0.2, 0.3, π,
+    1e-4, 1e-4,]
+
+    optparams = OptimParameters(4, vec)
+    orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.001)
+
+    orbit = Orbit(4, optparams, orbparams)
+
+    anoms = get_anomalies(orbit.s, orbit.ic)
+
+    for i=2:orbit.nplanet
+        @test isapprox(anoms[i][2], vec[3+i]; atol=1e-8)
+    end
+end
+
 # @testset "Orbit initialization" begin
 #     ωs = [0., π/2, π, -π/2, 1e-4, -1e-4]
 #     es = [0.0001, 0.1, 0.5, 0.9]
