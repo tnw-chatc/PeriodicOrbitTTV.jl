@@ -52,8 +52,8 @@ Orbit(N::Int, optparams::OptimParameters{T}, κ::T) where T <: AbstractFloat = b
     t0_init_2 = M2t0(optparams.M, optparams.e2, κ*ONE_YEAR, optparams.Δω)
 
     p1 = Elements(m=1)
-    p2 = Elements(m=1e-4, P=ONE_YEAR, e=optparams.e1, ω=0, t0=t0_init_1)
-    p3 = Elements(m=1e-4, P=κ*ONE_YEAR, e=optparams.e2, ω=optparams.Δω, t0=t0_init_2)
+    p2 = Elements(m=1e-4, P=ONE_YEAR, e=optparams.e1, ω=0, I=π/2, t0=t0_init_1)
+    p3 = Elements(m=1e-4, P=κ*ONE_YEAR, e=optparams.e2, ω=optparams.Δω, I=π/2, t0=t0_init_2)
 
     ic = ElementsIC(0., N+1, p1, p2, p3)
     s = State(ic)
