@@ -51,7 +51,8 @@ Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
 @kwdef struct OrbitParameters{T<:AbstractFloat}
     mass::Vector{T}
-    κ::T 
+    cfactor::Vector{T}
+    κ::T
 end
 
 """
@@ -62,23 +63,27 @@ Takes the number of planets, `OptimParameters` object and (for now) `κ`
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
     ONE_YEAR = 365.242
 
-    # Initializes array for t0_init
+    # Initializes arrays
     t0_init = Vector{T}(undef, n)
     periods = Vector{T}(undef, n)
     omegas = Vector{T}(undef, n)
     planets = Vector{Elements}(undef, n)
-    κ = orbparams.κ
 
-    # Calculates periods
-    # TODO: Properly calculates period based on Gozdziewski
-    periods = [(κ^i) * ONE_YEAR for i in 1:n]
+    pratio_nom = Vector{T}(undef, n-1)
+    pratio_nom[1] = orbparams.κ
+    
+    for i = 2:n-1
+        pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+    end 
 
     # Fills in missing M
     mean_anoms = vcat(0.0, optparams.M)
 
-    # Calculates the actual ω's from Δω
+    # Calculates the actual ω's from Δω and periods
     omegas[1] = 0.
+    periods[1] = ONE_YEAR
     for i = 2:n
+        periods[i] = pratio_nom[i-1] * periods[i-1]
         omegas[i] = optparams.Δω[i-1] + omegas[i-1]
     end
 
@@ -97,7 +102,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     ic = ElementsIC(0., n+1, star, planets...)
     s = State(ic)
 
-    Orbit(s, ic, κ)
+    Orbit(s, ic, orbparams.κ)
 end
 
 function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
