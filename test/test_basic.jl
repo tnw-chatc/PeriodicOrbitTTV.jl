@@ -44,7 +44,7 @@ end
         for i=1:ic.nbody
             pre_elems = ic.elements[i,:]
             elems = get_orbital_elements(s, ic)[i]
-            post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), elems.I, elems.Ω]
+            post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), rem2pi(elems.I, RoundNearest), rem2pi(elems.Ω, RoundNearest)]
             @test isapprox(pre_elems, post_elems; atol=1e-8)
         end
     end
