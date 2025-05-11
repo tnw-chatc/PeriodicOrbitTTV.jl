@@ -2,6 +2,7 @@ using NbodyGradient
 include("PeriodicOrbit.jl")
 using .PeriodicOrbit
 
+# TODO: Move tests to `test/` and integrate it with Julia unit test.
 # Create a simple two-planet system
 star = Elements(m=1.0)
 planet1 = Elements(m=0.001, P=1.0, e=0.1, ω=0.0, I=π/2, t0=0.0)

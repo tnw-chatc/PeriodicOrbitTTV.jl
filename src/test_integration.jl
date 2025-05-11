@@ -3,6 +3,7 @@ using LinearAlgebra
 include("PeriodicOrbit.jl")
 using .PeriodicOrbit
 
+# TODO: Move tests to `test/` and integrate it with Julia unit test.
 function test_integration_accuracy()
     println("Testing integration accuracy...")
     
