@@ -3,6 +3,16 @@ using NbodyGradient: kepler, ekepler
 using Rotations
 using LinearAlgebra: dot
 
+"""
+    Orbit{T<:AbstractFloat}
+
+Orbit object encapsulates the information about `State` and `InittialConditions` of the system
+
+# Fields
+- `s::State` : `State` object of the system
+- `ic::InitialConditions` : `InitialConditions` object of the system.
+- `nplanet::Int` : The number of the planets in the system
+"""
 mutable struct Orbit{T<:AbstractFloat}
     s::State
     ic::InitialConditions
@@ -18,7 +28,7 @@ mutable struct Orbit{T<:AbstractFloat}
     end
 end
 
-"""Vectorized optimization parameters."""
+"""Optimization parameters."""
 @kwdef struct OptimParameters{T<:AbstractFloat}
     e::Vector{T}
     M::Vector{T}
@@ -26,7 +36,25 @@ end
     Pratio::Vector{T}
 end
 
-"""Constructor for optimization parameters."""
+"""
+    OptimParameters(N::Int, vec::Vector{T}) 
+
+Convert a plain, non-keyworded optimization paramenter vector into OptimParameters object. Used as an argument for Orbit constructor.
+
+# Arguments
+- `N:Int` : The number of planets (N >= 2)
+- `vec::Vector{T}` : The optimization vector as a plain, non-keyworded vector
+
+`vec::Vector{T}` has a specific order: `N` eccentricities, `N - 1` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020). 
+One example for a four-planet system:
+```
+vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities 
+    π, -π/2, 0,             # Mean anomalies
+    0., π/2, π,             # Omega differences
+    1e-4, 1e-4,]            # Period ratios
+```
+Note that `vec::Vector{T}` must be consistent with the given the number of planets.
+"""
 function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
     if N == 2
         OptimParameters(vec[1:2], vec[3], vec[4], nothing)
@@ -49,6 +77,26 @@ tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeo
 
 Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 
+"""
+    OrbitParameters{T<:AbstractFloat}
+
+Orbital parameters that will not be affected by the optimization
+
+# Fields
+- `mass::Vector{T}` : Mass of each planet
+- `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
+- `κ::T` : Constant κ defined in G&M (2020)
+
+One example for a four-planet system:
+```
+OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4],   # Masses of the planets
+                [0.5, 0.5],                 # C_i factors
+                2.000)                      # κ
+```
+
+Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
+
+"""
 @kwdef struct OrbitParameters{T<:AbstractFloat}
     mass::Vector{T}
     cfactor::Vector{T}
@@ -56,9 +104,35 @@ Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
 end
 
 """
-Alternative constructor for `Orbit` object
+    Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
 
-Takes the number of planets, `OptimParameters` object and (for now) `κ`
+Main constructor for Orbit object. Access states and initial conditions of the system via `s` and `ic` attributes.
+
+# Arguments
+- `n::Int` : The number of planets
+- `optparams::OptimParameters{T}` : Optimization parameters
+- `orbparams::OrbitParameters{T}` : Orbit parameters
+
+# Examples
+
+The following example is to initialize a four-planet system
+```
+# The order is the same: eccentricities, mean anomalies, ω differences, and period ratios
+vec = [0.1, 0.1, 0.1, 0.1,
+    1., 1., 2.,
+    0., 0., 0.,
+    1e-4, 1e-4,]
+
+# Number of planets, optimization vectors
+optparams = OptimParameters(4, vec)
+# Three arguements: planet masses vector, C values (in this case a vector consist of 0.5s, and kappa)
+orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000)
+
+# Orbit object takes three arguments: number of planets, opt params, and orbit params
+orbit = Orbit(4, optparams, orbparams)
+```
+
+Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
     ONE_YEAR = 365.242
