@@ -75,8 +75,6 @@ end
 # Converts OptimParameters to a vector
 tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeof(x))]
 
-Base.Broadcast.broadcastable(x::OptimParameters) = Ref(x)
-
 """
     OrbitParameters{T<:AbstractFloat}
 
@@ -179,6 +177,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     Orbit(s, ic, orbparams.κ)
 end
 
+"""Will remove soon"""
 function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
     # Target mean anomaly for two planet system is 4π
     orbit = Orbit(2, optparams, 2.00)
