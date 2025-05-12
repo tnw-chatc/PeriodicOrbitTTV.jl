@@ -212,7 +212,9 @@ end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     println("Orbit")
-    println("Current time: $(o.s.t)")
+    println("Number of planets: $(o.ic.nbody-1)")
+    println("Current time: $(o.s.t[1])")
+    println("Planet masses: $(o.ic.m[2:end])")
     return
 end
 
