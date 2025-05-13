@@ -220,11 +220,11 @@ end
 
 """Calculates t0 offset to correct initialization on the x-axis"""
 function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
-    # Offsetting ω
-    ω += π/2
+    # Offsetting true anomaly
+    f = ω + pi/2
 
     # Eccentric anomaly
-    E = 2 * atan( sqrt((1 - e) / (1 + e)) * tan(ω / 2) )
+    E = 2 * atan( sqrt((1 - e) / (1 + e)) * tan(f / 2) )
 
     # Mean anomaly
     M = E - e * sin(E)
