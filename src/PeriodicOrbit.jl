@@ -14,7 +14,7 @@ export optimize!
 # For debugging
 export normvec
 export mag
-
+export get_relative_positions, M2t0
 
 include("elements.jl")
 include("optimizer.jl")

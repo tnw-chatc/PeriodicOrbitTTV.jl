@@ -212,17 +212,19 @@ end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     println("Orbit")
-    println("Current time: $(o.s.t)")
+    println("Number of planets: $(o.ic.nbody-1)")
+    println("Current time: $(o.s.t[1])")
+    println("Planet masses: $(o.ic.m[2:end])")
     return
 end
 
 """Calculates t0 offset to correct initialization on the x-axis"""
 function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
-    # Offsetting ω
-    ω += π/2
+    # Offsetting true anomaly
+    f = ω + pi/2
 
     # Eccentric anomaly
-    E = 2 * atan( sqrt((1 - e) / (1 + e)) * tan(ω / 2) )
+    E = 2 * atan( sqrt((1 - e) / (1 + e)) * tan(f / 2) )
 
     # Mean anomaly
     M = E - e * sin(E)
