@@ -16,8 +16,8 @@ export normvec
 export mag
 export get_relative_positions, M2t0
 
+include("orbits.jl")
 include("elements.jl")
 include("optimizer.jl")
-include("orbits.jl")
 
 end # module PeriodicOrbit
