@@ -1,8 +1,72 @@
 using NbodyGradient
 using LinearAlgebra
-using Optim
-include("PeriodicOrbit.jl")
-using .PeriodicOrbit
+using Optimization
+
+function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
+
+    function objective_func()
+        # Initialize the orbit system
+        nplanet = length(orbparams.mass)
+        integration_time = orbparams.tsys
+        weights = orbparams.weights
+        orbit = Orbit(nplanet, optparams, orbparams)
+
+        # Extract initial state
+        init_elems = get_orbital_elements(orbit.s, orbit.ic)
+        init_anoms = get_anomalies(orbit.s, orbit.ic)
+
+        init_e = [init_elems[i].e for i in eachindex(init_elems)[2:end]]
+        init_M = [init_anoms[i][2] for i in eachindex(init_anoms)]
+        init_ωdiff = [init_elems[i].ω - init_elems[i-1].ω for i in eachindex(init_elems)[3:end]]
+        # TODO: Properly implement this as defined in G&M
+        init_pratiodev = [init_elems[i].P / init_elems[i-1].P for i in eachindex(init_elems)[4:end]]
+        init_inner_period = init_elems[2].P
+
+        # Integrate the system
+        step_size = 0.01 * actual_period
+        current_time = 0.0
+        
+        while current_time < integration_time
+            next_step = min(step_size, integration_time - current_time)
+            intr = Integrator(ahl21!, next_step, next_step)
+            intr(orbit.s)
+            current_time = orbit.s.t[1]
+        end
+
+        # Extract final state
+        final_elems = get_orbital_elements(orbit.s, orbit.ic)
+        final_anoms = get_anomalies(orbit.s, orbit.ic)
+
+        final_e = [final_elems[i].e for i in eachindex(final_elems)[2:end]]
+        final_M = [final_anoms[i][2] for i in eachindex(final_anoms)]
+        final_ωdiff = [final_elems[i].ω - final_elems[i-1].ω for i in eachindex(final_elems)[3:end]]
+        # TODO: Properly implement this as defined in G&M
+        final_pratiodev = [final_elems[i].P / final_elems[i-1].P for i in eachindex(final_elems)[4:end]]
+        final_inner_period = final_elems[2].P
+
+        # Calculate differences
+        diff_e = final_e - init_e
+        diff_M = rem2pi.(final_M - init_M, RoundNearest)
+        diff_ωdiff = rem2pi.(final_e - init_e, RoundNearest)
+        diff_pratiodev = final_e - init_e
+        diff_inner_period = final_inner_period - init_inner_period
+
+        # Multiply the weights
+        diff_e *= weights[1]
+        diff_M *= weights[2]
+        diff_ωdiff *= weights[3]
+        diff_pratiodev *= weights[4]
+        diff_inner_period *= weights[5]
+
+        # Sum of the squares
+        diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+
+        return sum(diff.^2)
+    end
+
+    
+
+end
 
 """
 # Arguments
@@ -457,58 +521,58 @@ function find_periodic_orbit(n_planets::Int=2;
 end
 
 
-function run_examples()
-    try
-        println("\n=========== 2-PLANET SYSTEM ===========")
-        s2, ic2, result2 = find_periodic_orbit(2)
-        println("Optimization of 2-planet system completed successfully!")
+# function run_examples()
+#     try
+#         println("\n=========== 2-PLANET SYSTEM ===========")
+#         s2, ic2, result2 = find_periodic_orbit(2)
+#         println("Optimization of 2-planet system completed successfully!")
         
-        println("\n=========== 3-PLANET SYSTEM ===========")
-        s3, ic3, result3 = find_periodic_orbit(3)
-        println("Optimization of 3-planet system completed successfully!")
+#         println("\n=========== 3-PLANET SYSTEM ===========")
+#         s3, ic3, result3 = find_periodic_orbit(3)
+#         println("Optimization of 3-planet system completed successfully!")
         
-        println("\n=========== 4-PLANET SYSTEM ===========")
-        s4, ic4, result4 = find_periodic_orbit(4)
-        println("Optimization of 4-planet system completed successfully!")
+#         println("\n=========== 4-PLANET SYSTEM ===========")
+#         s4, ic4, result4 = find_periodic_orbit(4)
+#         println("Optimization of 4-planet system completed successfully!")
         
-        return (s2, ic2, result2), (s3, ic3, result3), (s4, ic4, result4)
-    catch e
-        println("Error during optimization:")
-        println(e)
-        println("\nBacktrace:")
-        for (exc, bt) in Base.catch_stack()
-            showerror(stdout, exc, bt)
-            println()
-        end
-    end
-end
+#         return (s2, ic2, result2), (s3, ic3, result3), (s4, ic4, result4)
+#     catch e
+#         println("Error during optimization:")
+#         println(e)
+#         println("\nBacktrace:")
+#         for (exc, bt) in Base.catch_stack()
+#             showerror(stdout, exc, bt)
+#             println()
+#         end
+#     end
+# end
 
 
-function run_example(n_planets::Int=2; kwargs...)
-    try
-        println("\n=========== $n_planets-PLANET SYSTEM ===========")
-        s, ic, result = find_periodic_orbit(n_planets; kwargs...)
-        println("Optimization of $n_planets-planet system completed successfully!")
-        return s, ic, result
-    catch e
-        println("Error during optimization:")
-        println(e)
-        println("\nBacktrace:")
-        for (exc, bt) in Base.catch_stack()
-            showerror(stdout, exc, bt)
-            println()
-        end
-    end
-end
+# function run_example(n_planets::Int=2; kwargs...)
+#     try
+#         println("\n=========== $n_planets-PLANET SYSTEM ===========")
+#         s, ic, result = find_periodic_orbit(n_planets; kwargs...)
+#         println("Optimization of $n_planets-planet system completed successfully!")
+#         return s, ic, result
+#     catch e
+#         println("Error during optimization:")
+#         println(e)
+#         println("\nBacktrace:")
+#         for (exc, bt) in Base.catch_stack()
+#             showerror(stdout, exc, bt)
+#             println()
+#         end
+#     end
+# end
 
 
-# results = run_examples()  # Run for 2, 3, and 4 planets
-# s, ic, result = run_example(2)  # Run just for 2 planets
-# s, ic, result = run_example(3)  # Run just for 3 planets
-#s, ic, result = run_example(4)  # Run just for 4 planets
-s, ic, result = run_example(4, 
-  planet_masses=[3e-6, 5e-6,  7e-5, 3e-5],
-  initial_eccentricities=[0.05, 0.07,0.05, 0.07],
-  kappa=2.0,  
-  max_iterations=600
-)
+# # results = run_examples()  # Run for 2, 3, and 4 planets
+# # s, ic, result = run_example(2)  # Run just for 2 planets
+# # s, ic, result = run_example(3)  # Run just for 3 planets
+# #s, ic, result = run_example(4)  # Run just for 4 planets
+# s, ic, result = run_example(4, 
+#   planet_masses=[3e-6, 5e-6,  7e-5, 3e-5],
+#   initial_eccentricities=[0.05, 0.07,0.05, 0.07],
+#   kappa=2.0,  
+#   max_iterations=600
+# )

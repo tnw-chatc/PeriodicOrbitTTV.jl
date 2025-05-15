@@ -34,6 +34,7 @@ end
     M::Vector{T}
     Δω::Vector{T}
     Pratio::Vector{T}
+    inner_period::T
 end
 
 """
@@ -62,14 +63,15 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
         error("N must be greater than 1!")
     end
 
-    @assert length(vec) == 4*N - 4 "The vector is inconsistent with N!"
+    @assert length(vec) == 4*N - 3 "The vector is inconsistent with N!"
 
     e = vec[1:N]
     M = vec[N+1:2N-1]
     Δω = vec[2N:3N-2]
-    Pratio = vec[3N-1:end]
+    Pratio = vec[3N-1:end-1]
+    inner_period = vec[end]
 
-    OptimParameters(e, M, Δω, Pratio)
+    OptimParameters(e, M, Δω, Pratio, inner_period)
 end
 
 # Converts OptimParameters to a vector
@@ -99,6 +101,8 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
     mass::Vector{T}
     cfactor::Vector{T}
     κ::T
+    tsys::T
+    weights::Vector{T}
 end
 
 """
@@ -144,6 +148,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     pratio_nom = Vector{T}(undef, n-1)
     pratio_nom[1] = orbparams.κ
     
+    # TODO: Properly implement this
     for i = 2:n-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
     end 
