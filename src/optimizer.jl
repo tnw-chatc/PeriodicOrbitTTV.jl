@@ -4,7 +4,9 @@ using Optim
 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
 
-    function objective_function()
+    function objective_function(optvec)
+        optparams = OptimParameters(nplanet, optvec)
+
         # Initialize the orbit system
         orbit = Orbit(nplanet, optparams, orbparams)
 
@@ -86,18 +88,20 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     append!(upper_bounds, fill(0.1, nplanet-2))
 
     # Bounds for innermost period
-    push!(lower_bounds, 0.5)
-    push!(upper_bounds, 2.0)
+    push!(lower_bounds, 0.5*365.242)
+    push!(upper_bounds, 2.0*365.242)
     
-    # println("Starting optimization with parameters:")
+    println("Starting optimization with parameters: $optparams")
     # println("  Inner planet period: $(initial_params[1])")
     # println("  Eccentricities: $(initial_eccentricities)")
     # println("  Arguments of perihelion: $(initial_omegas)")
     # println("  Period ratio deviations: $(period_ratio_deviations)")
     # println("  Mean anomalies: $(initial_mean_anomalies)")
   
+    optvec = reduce(vcat, tovector(optparams))
+
     try
-        test_result = objective_function()
+        test_result = objective_function(optvec)
         println("Test objective function evaluation: ", test_result)
     catch e
         println("Error testing objective function:")
@@ -107,11 +111,12 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     
     # Optimize using Optim.jl
     println("Starting optimization...")
+    max_iterations = 200
     result = optimize(
         objective_function,
         lower_bounds,
         upper_bounds,
-        initial_params,
+        optvec,
         Fminbox(NelderMead()),
         Optim.Options(iterations=max_iterations, show_trace=true)
     )
