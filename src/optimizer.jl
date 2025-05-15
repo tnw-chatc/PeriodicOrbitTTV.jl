@@ -46,8 +46,8 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         # Calculate differences
         diff_e = final_e - init_e
         diff_M = rem2pi.(final_M - init_M, RoundNearest)
-        diff_ωdiff = rem2pi.(final_e - init_e, RoundNearest)
-        diff_pratiodev = final_e - init_e
+        diff_ωdiff = rem2pi.(final_ωdiff - init_ωdiff, RoundNearest)
+        diff_pratiodev = final_pratiodev - init_pratiodev
         diff_inner_period = final_inner_period - init_inner_period
 
         # Multiply the weights
