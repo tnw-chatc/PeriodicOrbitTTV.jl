@@ -7,7 +7,7 @@ using NbodyGradient
 
 export Orbit, OptimParameters, OrbitParameters
 
-export convert_to_elements, get_orbital_elements, get_anomalies
+export convert_to_elements, get_orbital_elements, get_anomalies, find_periodic_orbit
 export integrate_to_M!
 export optimize!
 
