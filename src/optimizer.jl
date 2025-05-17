@@ -17,8 +17,17 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         init_e = [init_elems[i].e for i in eachindex(init_elems)[2:end]]
         init_M = [init_anoms[i][2] for i in eachindex(init_anoms)]
         init_ωdiff = [init_elems[i].ω - init_elems[i-1].ω for i in eachindex(init_elems)[3:end]]
-        # TODO: Properly implement this as defined in G&M
-        init_pratiodev = [init_elems[i].P / init_elems[i-1].P for i in eachindex(init_elems)[4:end]]
+
+        # Period ratio deviation
+        pratio_nom = Vector{T}(undef, nplanet-1)
+        pratio_nom[1] = orbparams.κ
+    
+        # TODO: Properly implement this
+        for i = 2:nplanet-1
+            pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+        end 
+
+        init_pratiodev = [(init_elems[i].P / init_elems[i-1].P) - pratio_nom[i-2] for i in eachindex(init_elems)[4:end]]
         init_inner_period = init_elems[2].P
 
         # Integrate the system
@@ -39,8 +48,17 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         final_e = [final_elems[i].e for i in eachindex(final_elems)[2:end]]
         final_M = [final_anoms[i][2] for i in eachindex(final_anoms)]
         final_ωdiff = [final_elems[i].ω - final_elems[i-1].ω for i in eachindex(final_elems)[3:end]]
-        # TODO: Properly implement this as defined in G&M
-        final_pratiodev = [final_elems[i].P / final_elems[i-1].P for i in eachindex(final_elems)[4:end]]
+
+        # Period ratio deviation
+        pratio_nom = Vector{T}(undef, nplanet-1)
+        pratio_nom[1] = orbparams.κ
+    
+        # TODO: Properly implement this
+        for i = 2:nplanet-1
+            pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+        end 
+
+        final_pratiodev = [(final_elems[i].P / final_elems[i-1].P) - pratio_nom[i-2] for i in eachindex(final_elems)[4:end]]
         final_inner_period = final_elems[2].P
 
         # Calculate differences
@@ -59,6 +77,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
         # Sum of the squares
         diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+        # println("DIFF NOW: $diff")
         println("DIFF SQUARED NOW: $(sum(diff.^2))")
 
         return sum(diff.^2)
