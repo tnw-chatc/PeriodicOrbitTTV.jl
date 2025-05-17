@@ -63,7 +63,9 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
         error("N must be greater than 1!")
     end
 
-    @assert length(vec) == 4*N - 3 "The vector is inconsistent with N!"
+    if length(vec) != 4 * N - 3
+        error("The vector is inconsistent with N!")
+    end
 
     e = vec[1:N]
     M = vec[N+1:2N-1]
