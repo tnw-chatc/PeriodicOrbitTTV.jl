@@ -59,6 +59,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
         # Sum of the squares
         diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+        println("DIFF SQUARED NOW: $(sum(diff.^2))")
 
         return sum(diff.^2)
     end
@@ -92,11 +93,11 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     push!(upper_bounds, 2.0*365.242)
     
     println("Starting optimization with parameters: $optparams")
-    # println("  Inner planet period: $(initial_params[1])")
-    # println("  Eccentricities: $(initial_eccentricities)")
-    # println("  Arguments of perihelion: $(initial_omegas)")
-    # println("  Period ratio deviations: $(period_ratio_deviations)")
-    # println("  Mean anomalies: $(initial_mean_anomalies)")
+    println("  Inner planet period: $(optparams.inner_period)")
+    println("  Eccentricities: $(optparams.e)")
+    println("  Arguments of perihelion: $(optparams.Δω)")
+    println("  Period ratio deviations: $(optparams.Pratio)")
+    println("  Mean anomalies: $(optparams.M)")
   
     optvec = reduce(vcat, tovector(optparams))
 
@@ -118,13 +119,23 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         upper_bounds,
         optvec,
         Fminbox(NelderMead()),
-        Optim.Options(iterations=max_iterations, show_trace=true)
+        # Optim.Options(iterations=max_iterations, show_trace=true)
+        Optim.Options(iterations=max_iterations)
     )
     
     # Extract optimized parameters
-    final_opt_params = Optim.minimizer(result)
+    final_optvec = Optim.minimizer(result)
 
-    return final_opt_params
+    final_optparams = OptimParameters(4, final_optvec)
+
+    println("Starting optimization with parameters: $final_optparams")
+    println("  Inner planet period: $(final_optparams.inner_period)")
+    println("  Eccentricities: $(final_optparams.e)")
+    println("  Arguments of perihelion: $(final_optparams.Δω)")
+    println("  Period ratio deviations: $(final_optparams.Pratio)")
+    println("  Mean anomalies: $(final_optparams.M)")
+
+    return final_optparams
 end
 
 """

@@ -139,7 +139,6 @@ orbit = Orbit(4, optparams, orbparams)
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
-    ONE_YEAR = 365.242
 
     # Initializes arrays
     t0_init = Vector{T}(undef, n)
@@ -160,7 +159,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
 
     # Calculates the actual ω's from Δω and periods
     omegas[1] = 0.
-    periods[1] = ONE_YEAR
+    periods[1] = optparams.inner_period
     for i = 2:n
         periods[i] = pratio_nom[i-1] * periods[i-1]
         omegas[i] = optparams.Δω[i-1] + omegas[i-1]
