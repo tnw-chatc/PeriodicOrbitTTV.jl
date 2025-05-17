@@ -31,7 +31,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         init_inner_period = init_elems[2].P
 
         # Integrate the system
-        step_size = 0.01 * init_inner_period
+        step_size = 0.1 * init_inner_period
         current_time = 0.0
         
         while current_time < integration_time
