@@ -2,7 +2,21 @@ using NbodyGradient
 using LinearAlgebra
 using Optim
 
-function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
+"""
+    find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; use_jac=false, verbose=false) where T <: AbstractFloat
+
+Find a periodic configuration that is periodic. Return the final parameter vector as `OptimParameters`.
+
+# Arguments
+- `optparams::OptimParameters{T}` : The optimization parameters. See its constructor's docstring.
+- `orbparams::OrbitParameters{T}` : The orbit parameters. These parameters are static during the entire optimizations. See its constructor's docstring.
+
+# Optionals
+- `use_jac::Bool` : Calculate and use Jacobians for optimization if true. False by default.
+- `verbose::Bool` : Print optimization log if true. False by default.
+"""
+function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; use_jac::Bool=false, verbose::Bool=false) where T <: AbstractFloat
+    # TODO: Implement `use_jac` and `verbose`
 
     function objective_function(optvec)
         optparams = OptimParameters(nplanet, optvec)
