@@ -92,7 +92,9 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         # Sum of the squares
         diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
         # println("DIFF NOW: $diff")
-        println("DIFF SQUARED NOW: $(sum(diff.^2))")
+        if verbose
+            println("DIFF SQUARED NOW: $(sum(diff.^2))")
+        end
 
         return sum(diff.^2)
     end
