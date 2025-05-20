@@ -55,10 +55,11 @@ end
     vec = [0.1, 0.2, 0.3, 0.4,
     0., 1.3, 5.0,
     0.2, 0.3, π,
-    1e-4, 1e-4,]
+    1e-4, 1e-4,
+    365.242]
 
     optparams = OptimParameters(4, vec)
-    orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.001)
+    orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000, 8*365.242, [1., 1., 5., 3., 2.])
 
     orbit = Orbit(4, optparams, orbparams)
 
