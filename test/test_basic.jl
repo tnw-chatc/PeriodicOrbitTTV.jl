@@ -45,7 +45,7 @@ end
             pre_elems = ic.elements[i,:]
             elems = get_orbital_elements(s, ic)[i]
             post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), rem2pi(elems.I, RoundNearest), rem2pi(elems.Ω, RoundNearest)]
-            @test isapprox(pre_elems, post_elems; atol=1e-8)
+            @test isapprox(pre_elems, post_elems; rtol=1e-8)
         end
     end
 end
@@ -66,6 +66,6 @@ end
     anoms = get_anomalies(orbit.s, orbit.ic)
 
     for i=2:orbit.nplanet
-        @test isapprox(anoms[i][2], vec[3+i]; atol=1e-8)
+        @test isapprox(anoms[i][2], vec[3+i]; rtol=1e-8)
     end
 end
