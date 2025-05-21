@@ -59,7 +59,7 @@ Note that `vec::Vector{T}` must be consistent with the given the number of plane
 """
 function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
     if N == 2
-        OptimParameters(vec[1:2], vec[3], vec[4], nothing)
+        OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
         error("N must be greater than 1!")
     end

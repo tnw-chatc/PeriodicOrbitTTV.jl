@@ -36,7 +36,6 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         pratio_nom = Vector{T}(undef, nplanet-1)
         pratio_nom[1] = orbparams.κ
     
-        # TODO: Properly implement this
         for i = 2:nplanet-1
             pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
         end 
@@ -161,7 +160,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     # Extract optimized parameters
     final_optvec = Optim.minimizer(result)
 
-    final_optparams = OptimParameters(4, final_optvec)
+    final_optparams = OptimParameters(nplanet, final_optvec)
 
     println("Starting optimization with parameters: $final_optparams")
     println("  Inner planet period: $(final_optparams.inner_period)")
