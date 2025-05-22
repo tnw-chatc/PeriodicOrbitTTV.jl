@@ -66,6 +66,6 @@ end
     anoms = get_anomalies(orbit.s, orbit.ic)
 
     for i=2:orbit.nplanet
-        @test isapprox(anoms[i][2], vec[3+i]; rtol=1e-8)
+        @test isapprox(rem2pi(anoms[i][2], RoundNearest), rem2pi(vec[3+i], RoundNearest); rtol=1e-8)
     end
 end
