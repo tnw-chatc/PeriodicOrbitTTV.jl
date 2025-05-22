@@ -47,10 +47,25 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     ω = ω_plus_f - f
 
     # (2.140)
-    E = 2 * atan(sqrt((1 - e) / (1 + e)) * tan(f / 2))
+    # Step 1: Solve for E explicitly from Eq. (2.42)
+    cosE = (a - R) / (a * e)
+    E = acos(clamp(cosE, -1, 1))
+
+    # Adjust E based on radial velocity
+    Rdot = dot(x, v) / R
+    if Rdot < 0
+        E = 2π - E
+    end
+
+    # Step 2: Calculate Mean anomaly M from Eq. (2.51)
     M = E - e * sin(E)
+
+    # Step 3: Mean motion n from Eq. (2.26)
     n_mean = sqrt(Gm / a^3)
+
+    # Step 4: Finally, τ from M and n (Eq. 2.51 rearranged)
     τ = t - M / n_mean
+
 
     return (
         a = a,
