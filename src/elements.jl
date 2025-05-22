@@ -21,7 +21,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     h = norm(hvec)
 
     # (2.134)
-    a = [1 / 2/R - v^2/Gm]^-1
+    a = 1. / (2/R - v2/Gm)
 
     # (2.135)
     e = sqrt(1 - h^2 / (Gm * a))
