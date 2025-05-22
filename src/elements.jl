@@ -57,13 +57,13 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
         E = 2π - E
     end
 
-    # Step 2: Calculate Mean anomaly M from Eq. (2.51)
+    #  Mean anomaly M from Eq. (2.51)
     M = E - e * sin(E)
 
-    # Step 3: Mean motion n from Eq. (2.26)
+    #  Mean motion n from Eq. (2.26)
     n_mean = sqrt(Gm / a^3)
 
-    # Step 4: Finally, τ from M and n (Eq. 2.51 rearranged)
+    #  τ from M and n (Eq. 2.51 rearranged)
     τ = t - M / n_mean
 
 
