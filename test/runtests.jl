@@ -7,5 +7,11 @@ using Test
     @testset "Basic Testing" begin
         include("test_basic.jl")
     end
+
+    println("Optimization...")
+    @testset "Optimization" begin
+        include("test_optim.jl")
+    end
+    
     println("Finished.")
 end

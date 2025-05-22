@@ -7,7 +7,7 @@ using NbodyGradient
 
 export Orbit, OptimParameters, OrbitParameters
 
-export convert_to_elements, get_orbital_elements, get_anomalies
+export convert_to_elements, get_orbital_elements, get_anomalies, find_periodic_orbit
 export integrate_to_M!
 export optimize!
 
@@ -16,8 +16,8 @@ export normvec
 export mag
 export get_relative_positions, M2t0
 
+include("orbits.jl")
 include("elements.jl")
 include("optimizer.jl")
-include("orbits.jl")
 
 end # module PeriodicOrbit

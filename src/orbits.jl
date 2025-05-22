@@ -34,6 +34,7 @@ end
     M::Vector{T}
     Δω::Vector{T}
     Pratio::Vector{T}
+    inner_period::T
 end
 
 """
@@ -45,31 +46,35 @@ Convert a plain, non-keyworded optimization paramenter vector into OptimParamete
 - `N:Int` : The number of planets (N >= 2)
 - `vec::Vector{T}` : The optimization vector as a plain, non-keyworded vector
 
-`vec::Vector{T}` has a specific order: `N` eccentricities, `N - 1` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020). 
+`vec::Vector{T}` has a specific order: `N` eccentricities, `N - 1` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020), and `1` innermost planet period. 
 One example for a four-planet system:
 ```
 vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities 
     π, -π/2, 0,             # Mean anomalies
     0., π/2, π,             # Omega differences
-    1e-4, 1e-4,]            # Period ratios
+    1e-4, 1e-4,             # Period ratios
+    365.242]                # Innermost planet period
 ```
 Note that `vec::Vector{T}` must be consistent with the given the number of planets.
 """
 function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
     if N == 2
-        OptimParameters(vec[1:2], vec[3], vec[4], nothing)
+        OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
         error("N must be greater than 1!")
     end
 
-    @assert length(vec) == 4*N - 4 "The vector is inconsistent with N!"
+    if length(vec) != 4 * N - 3
+        error("The vector is inconsistent with N! Expected $(4 * N - 3), got $(length(vec)) instead")
+    end
 
     e = vec[1:N]
     M = vec[N+1:2N-1]
     Δω = vec[2N:3N-2]
-    Pratio = vec[3N-1:end]
+    Pratio = vec[3N-1:end-1]
+    inner_period = vec[end]
 
-    OptimParameters(e, M, Δω, Pratio)
+    OptimParameters(e, M, Δω, Pratio, inner_period)
 end
 
 # Converts OptimParameters to a vector
@@ -84,12 +89,16 @@ Orbital parameters that will not be affected by the optimization
 - `mass::Vector{T}` : Mass of each planet
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
 - `κ::T` : Constant κ defined in G&M (2020)
+- `tsys::T` : Periodic orbit system period (i.e., integration time)
+- `weights::Vector{T}` : The weights for calculating differences during optimization. The order follows the parameters of `OptimParameters`.
 
 One example for a four-planet system:
 ```
 OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4],   # Masses of the planets
                 [0.5, 0.5],                 # C_i factors
-                2.000)                      # κ
+                2.000,                      # κ
+                8*365.242,                  # Periodic orbit system period
+                [1., 1., 5., 3., 2.])       # Optimization weightss         
 ```
 
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
@@ -99,6 +108,8 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
     mass::Vector{T}
     cfactor::Vector{T}
     κ::T
+    tsys::T
+    weights::Vector{T}
 end
 
 """
@@ -116,15 +127,17 @@ Main constructor for Orbit object. Access states and initial conditions of the s
 The following example is to initialize a four-planet system
 ```
 # The order is the same: eccentricities, mean anomalies, ω differences, and period ratios
-vec = [0.1, 0.1, 0.1, 0.1,
-    1., 1., 2.,
+vec = [0.05, 0.07, 0.05, 0.07,
     0., 0., 0.,
-    1e-4, 1e-4,]
+    0., 0., 0.,
+    1e-4, 1e-4,
+    365.242,
+]
 
 # Number of planets, optimization vectors
 optparams = OptimParameters(4, vec)
 # Three arguements: planet masses vector, C values (in this case a vector consist of 0.5s, and kappa)
-orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000)
+orbparams = OrbitParameters([3e-6, 5e-6, 7e-5, 3e-5], [0.5, 0.5], 2.000, 8*365.2422, [1., 1., 5., 3., 2.])
 
 # Orbit object takes three arguments: number of planets, opt params, and orbit params
 orbit = Orbit(4, optparams, orbparams)
@@ -133,7 +146,6 @@ orbit = Orbit(4, optparams, orbparams)
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
-    ONE_YEAR = 365.242
 
     # Initializes arrays
     t0_init = Vector{T}(undef, n)
@@ -144,6 +156,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     pratio_nom = Vector{T}(undef, n-1)
     pratio_nom[1] = orbparams.κ
     
+    # TODO: Properly implement this
     for i = 2:n-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
     end 
@@ -153,7 +166,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
 
     # Calculates the actual ω's from Δω and periods
     omegas[1] = 0.
-    periods[1] = ONE_YEAR
+    periods[1] = optparams.inner_period
     for i = 2:n
         periods[i] = pratio_nom[i-1] * periods[i-1]
         omegas[i] = optparams.Δω[i-1] + omegas[i-1]
@@ -175,39 +188,6 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     s = State(ic)
 
     Orbit(s, ic, orbparams.κ)
-end
-
-"""Will remove soon"""
-function optimize!(optparams::OptimParameters{T}) where T <: AbstractFloat
-    # Target mean anomaly for two planet system is 4π
-    orbit = Orbit(2, optparams, 2.00)
-
-    target_M = 4π
-    target_time, times, Ms = integrate_to_M!(orbit.s, orbit.ic, target_M, 1);
-
-    orbit.s = State(orbit.ic)
-    intr = Integrator(0.5, 0., target_time)
-    intr(orbit.s)
-
-    # TODO: Implement the actual optimization for N-body system (currently only for 2 planets)
-    # TODO: Make sure the angle wrapping works as intended
-    final_e1 = get_orbital_elements(orbit.s, orbit.ic)[2].e
-    final_e2 = get_orbital_elements(orbit.s, orbit.ic)[3].e
-    final_M = get_anomalies(orbit.s, orbit.ic)[1][2]
-    final_Δω = get_orbital_elements(orbit.s, orbit.ic)[3].ω - get_orbital_elements(orbit.s, orbit.ic)[2].ω
-
-    final_optparams = [final_e1, final_e2, rem2pi(final_M, RoundNearest), rem2pi(final_Δω, RoundNearest)]
-
-    # Init params
-    init_optparams = tovector(optparams)
-    
-    # Wrap angles
-    init_optparams[3] = rem2pi(init_optparams[3], RoundNearest)
-    init_optparams[4] = rem2pi(init_optparams[4], RoundNearest)
-
-    diff = final_optparams .- init_optparams
-
-    return sum(diff.^2)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
