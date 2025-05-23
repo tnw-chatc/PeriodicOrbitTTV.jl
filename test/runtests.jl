@@ -12,6 +12,11 @@ using Test
     @testset "Optimization" begin
         include("test_optim.jl")
     end
+
+    println("Derivatives Calculation...")
+    @testset "Jacobians" begin
+        include("test_jacobians.jl")
+    end
     
     println("Finished.")
 end

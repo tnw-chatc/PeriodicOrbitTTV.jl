@@ -1,2 +1,3 @@
 ptest_*
 *.DS_Store
+.vscode/*

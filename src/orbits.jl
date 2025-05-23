@@ -2,9 +2,10 @@ using NbodyGradient: State, Elements, ElementsIC, InitialConditions
 using NbodyGradient: kepler, ekepler
 using Rotations
 using LinearAlgebra: dot
+using Zygote
 
 """
-    Orbit{T<:AbstractFloat}
+    Orbit{T<:Real}
 
 Orbit object encapsulates the information about `State` and `InittialConditions` of the system
 
@@ -13,23 +14,25 @@ Orbit object encapsulates the information about `State` and `InittialConditions`
 - `ic::InitialConditions` : `InitialConditions` object of the system.
 - `nplanet::Int` : The number of the planets in the system
 """
-mutable struct Orbit{T<:AbstractFloat}
+mutable struct Orbit{T<:Real}
     s::State
     ic::InitialConditions
     κ::T
     nplanet::Int
+    jac::Matrix{T}
+    elem_matrix::Matrix{T}
 
-    function Orbit(s::State, ic::InitialConditions, κ::T) where T <: AbstractFloat
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac::Matrix{T}, elems::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet)
+        new{T}(s, ic, κ, nplanet, jac, elems)
     end
 end
 
 """Optimization parameters."""
-@kwdef struct OptimParameters{T<:AbstractFloat}
+@kwdef struct OptimParameters{T<:Real}
     e::Vector{T}
     M::Vector{T}
     Δω::Vector{T}
@@ -57,7 +60,7 @@ vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities
 ```
 Note that `vec::Vector{T}` must be consistent with the given the number of planets.
 """
-function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
+function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     if N == 2
         OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
@@ -78,10 +81,10 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
 end
 
 # Converts OptimParameters to a vector
-tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeof(x))]
+tovector(x::OptimParameters) = reduce(vcat, [getfield(x, field) for field in fieldnames(typeof(x))])
 
 """
-    OrbitParameters{T<:AbstractFloat}
+    OrbitParameters{T<:Real}
 
 Orbital parameters that will not be affected by the optimization
 
@@ -104,7 +107,7 @@ OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4],   # Masses of the planets
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
 
 """
-@kwdef struct OrbitParameters{T<:AbstractFloat}
+@kwdef struct OrbitParameters{T<:Real}
     mass::Vector{T}
     cfactor::Vector{T}
     κ::T
@@ -113,7 +116,7 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 end
 
 """
-    Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
+    Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: Real
 
 Main constructor for Orbit object. Access states and initial conditions of the system via `s` and `ic` attributes.
 
@@ -145,49 +148,70 @@ orbit = Orbit(4, optparams, orbparams)
 
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
 """
-Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
+Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: Real = begin
 
-    # Initializes arrays
-    t0_init = Vector{T}(undef, n)
-    periods = Vector{T}(undef, n)
-    omegas = Vector{T}(undef, n)
-    planets = Vector{Elements}(undef, n)
+    # TODO: Might find a way to make this vector<->object conversion less awkward
 
-    pratio_nom = Vector{T}(undef, n-1)
-    pratio_nom[1] = orbparams.κ
-    
-    # TODO: Properly implement this
-    for i = 2:n-1
-        pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+    function optparams_to_elementsIC(optvec::Vector{T}) where T <: Real
+        nplanet = length(orbparams.mass)
+        optparams = OptimParameters(nplanet, optvec)
+
+        # Initializes arrays
+        t0_init = Vector{T}(undef, n)
+        periods = Vector{T}(undef, n)
+        omegas = Vector{T}(undef, n)
+        planets = Vector{Elements}(undef, n)
+
+        pratio_nom = Vector{T}(undef, n-1)
+        pratio_nom[1] = orbparams.κ
+        
+        # TODO: Properly implement this
+        for i = 2:n-1
+            pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+        end 
+
+        # Fills in missing M
+        mean_anoms = vcat(0.0, optparams.M)
+
+        # Calculates the actual ω's from Δω and periods
+        omegas[1] = 0.
+        periods[1] = optparams.inner_period
+        for i = 2:n
+            periods[i] = pratio_nom[i-1] * periods[i-1]
+            omegas[i] = optparams.Δω[i-1] + omegas[i-1]
+        end
+
+        # Calculates t0 for initialization
+        for i = 1:n
+            t0_init[i] = M2t0(mean_anoms[i], optparams.e[i], periods[i], omegas[i])
+        end
+
+        star_elem = [[1., 0., 0., 0., 0., 0., 0.]]
+        planet_elems = vcat([
+            [orbparams.mass[i], periods[i], t0_init[i], optparams.e[i]*cos(omegas[i]), optparams.e[i]*sin(omegas[i]), π/2, 0.] for i in 1:nplanet
+        ])
+
+        # Combine star and planets and convert to matrix
+        elem_matrix = reduce(vcat, vcat(star_elem, planet_elems)')
+
+        return elem_matrix
     end 
 
-    # Fills in missing M
-    mean_anoms = vcat(0.0, optparams.M)
+    nplanet = length(orbparams.mass)
 
-    # Calculates the actual ω's from Δω and periods
-    omegas[1] = 0.
-    periods[1] = optparams.inner_period
-    for i = 2:n
-        periods[i] = pratio_nom[i-1] * periods[i-1]
-        omegas[i] = optparams.Δω[i-1] + omegas[i-1]
-    end
+    # Deepcopy to preserve the original type as ForwardDiff mutates the function (somehow?)
+    elem_mat = deepcopy(optparams_to_elementsIC(tovector(optparams)))
 
-    # Calculates t0 for initialization
-    for i = 1:n
-        t0_init[i] = M2t0(mean_anoms[i], optparams.e[i], periods[i], omegas[i])
-    end
+    jac_elems_to_ic = (p -> ForwardDiff.jacobian(optparams_to_elementsIC, p))(tovector(optparams))
 
-    # Primary object
-    star = Elements(m=1.)
-
-    for i = 1:n 
-        planets[i] = Elements(m=orbparams.mass[i], P=periods[i], e=optparams.e[i], ω=omegas[i], I=π/2, t0=t0_init[i])
-    end
-
-    ic = ElementsIC(0., n+1, star, planets...)
+    ic = ElementsIC(0., nplanet+1, Float64.(elem_mat))
     s = State(ic)
 
-    Orbit(s, ic, orbparams.κ)
+    # Drop the star entries
+    elem_mat = elem_mat[2:end,:]
+    jac_elems_to_ic = jac_elems_to_ic[setdiff(1:7*(nplanet+1), 1:nplanet+1:7*(nplanet+1)),:]
+
+    Orbit(s, ic, orbparams.κ, jac_elems_to_ic, elem_mat)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
@@ -199,7 +223,7 @@ Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
 end
 
 """Calculates t0 offset to correct initialization on the x-axis"""
-function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
+function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
     # Offsetting true anomaly
     f = ω + pi/2
 
