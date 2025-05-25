@@ -334,12 +334,6 @@ function main()
     println("\nInner planet period:")
     println("  P_inner diff = ", final_P[1] - init_P[1])
     
-
-    println("\nActual periods:")
-    for i in 1:nplanet
-        println("  Planet $i: P = ", final_P[i])
-    end
-    
     println("\nActual period ratios:")
     for i in 2:nplanet
         println("  P_$i/P_$(i-1) = ", final_P[i]/final_P[i-1])
