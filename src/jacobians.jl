@@ -84,7 +84,7 @@ end
 """
 Compute ∂elements/∂{x,v} using finite differences
 """
-function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where T<:AbstractFloat
+function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where T<:Real
     n = s.n
     
     # Get current orbital elements

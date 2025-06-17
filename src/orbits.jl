@@ -167,7 +167,6 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         pratio_nom = Vector{T}(undef, n-1)
         pratio_nom[1] = orbparams.κ
         
-        # TODO: Properly implement this
         for i = 2:n-1
             pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
         end 
@@ -175,11 +174,14 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         # Fills in missing M
         mean_anoms = vcat(0.0, optparams.M)
 
+        # Fill in Period ratio deviation for later use
+        period_dev = vcat(0.0, optparams.Pratio)
+
         # Calculates the actual ω's from Δω and periods
         omegas[1] = 0.
         periods[1] = optparams.inner_period
         for i = 2:n
-            periods[i] = pratio_nom[i-1] * periods[i-1]
+            periods[i] = (pratio_nom[i-1] + period_dev[i-1]) * periods[i-1]
             omegas[i] = optparams.Δω[i-1] + omegas[i-1]
         end
 
@@ -199,9 +201,8 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         return elem_matrix
     end 
     
-    """An internal function to calculate time evolution jacobian (Jacobian 3)
-    
-    Use a deepcopied `State` only, as the integrator mutates the `State` object."""
+    # An internal function to calculate time evolution jacobian (Jacobian 3)
+    # Use a deepcopied `State` only, as the integrator mutates the `State` object.
     function calculate_jac_time_evolution(state::State{T}, tsys::T, inn_period::T) where T <: Real
         d = Derivatives(T, state.n)
 
@@ -229,7 +230,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Define first Jacobian (orbital elements to ElementsIC)
     jac_elems_to_ic = (p -> ForwardDiff.jacobian(optparams_to_elementsIC, p))(tovector(optparams))
 
-    ic = ElementsIC(0., nplanet+1, Float64.(elem_mat))
+    ic = ElementsIC(convert(T, 0.), nplanet+1, convert(Matrix{T}, elem_mat))
     s = State(ic)
 
     # Drop the star entries
@@ -242,14 +243,16 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
 
     # Define third Jacobian (Time evolution)
     # Drop the star entries
-    jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
+    jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), convert(T, orbparams.tsys), get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
 
     # Define fouth Jacobian (Final Cartesian to Final ElementsIC
     # Drop the star columns and mass rows
     # TODO: Make sure this is the right thing to do
     jac_fcart_to_fic = compute_cartesian_to_elements_jacobian(deepcopy(s), ic)[1][1:nplanet*6,8:end]
 
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic)
+    # Temporarily force promoting to BigFloat
+    # TODO: Remove force promotion
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, (jac_ic_to_cart), (jac_time_evolution), (jac_fcart_to_fic))
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin

@@ -6,7 +6,7 @@ using NbodyGradient: Point
 mag(x) = sqrt(dot(x,x))
 mag(x,v) = sqrt(dot(x,v))
 
-Rdotmag(R::T,V::T,h::T) where T <: AbstractFloat = V^2 - (h/R)^2 
+Rdotmag(R::T,V::T,h::T) where T <: Real = V^2 - (h/R)^2 
 
 function point2vector(x::NbodyGradient.Point)
     return [x.x, x.y, x.z]
@@ -14,7 +14,7 @@ end
 
 using LinearAlgebra
 
-function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <: AbstractFloat
+function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <: Real
     R = norm(x)
     v2 = dot(v, v)
     hvec = cross(x, v)
@@ -83,7 +83,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
 end
 
 
-function normvec(x::Vector{T}, v::Vector{T}, Gm::T) where T <: AbstractFloat
+function normvec(x::Vector{T}, v::Vector{T}, Gm::T) where T <: Real
     # TODO: Need more comprehensive testing
     r = mag(x)
     hvec = cross(x, v)
@@ -95,12 +95,13 @@ function normvec(x::Vector{T}, v::Vector{T}, Gm::T) where T <: AbstractFloat
     return nvec
 end
 
-function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: AbstractFloat
+function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real
     elems = Elements{T}[]
-    μs = get_relative_masses(ic)
+    μs = convert(Vector{T}, get_relative_masses(ic))
     X, V = get_relative_positions(s.x, s.v, ic)
-    X = point2vector.(X)
-    V = point2vector.(V)
+    X = convert(Vector{Vector{T}}, point2vector.(X))
+    V = convert(Vector{Vector{T}}, point2vector.(V))
+
     push!(elems, Elements(m=ic.m[1]))  # Central body
     i = 1; b = 0
     while i < ic.nbody
@@ -108,7 +109,7 @@ function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: 
             b += 1
         end
         a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[i+b], V[i+b], μs[i+b], s.t[1])
-        push!(elems, Elements(ic.m[i+1], 2π / n, 0.0, e*cos(ω), e*sin(ω), I, Ω, a, e, ω, τ))
+        push!(elems, Elements(ic.m[i+1], 2π / n, convert(T, 0.0), e*cos(ω), e*sin(ω), I, Ω, a, e, ω, τ))
         if b > 0
             b -= 2
         elseif b < 0
@@ -119,12 +120,13 @@ function get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: 
     return elems
 end
 
-function get_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: AbstractFloat
+function get_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: Real
     anoms = Vector{T}[]
-    μs = get_relative_masses(ic)
+    μs = convert(Vector{T}, get_relative_masses(ic))
     X, V = get_relative_positions(s.x, s.v, ic)
-    X = point2vector.(X)
-    V = point2vector.(V)
+    X = convert(Vector{Vector{T}}, point2vector.(X))
+    V = convert(Vector{Vector{T}}, point2vector.(V))
+
     i = 1; b = 0
     while i < ic.nbody
         if first(ic.ϵ[i, :]) == zero(T)

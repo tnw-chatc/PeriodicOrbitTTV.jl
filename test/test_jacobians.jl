@@ -42,7 +42,8 @@ using Test
 
     optvec_derivatives = reduce(hcat, optvec_derivatives)
 
-    test_matrix = isapprox.(orbit_0.jac, optvec_derivatives; rtol=epsilon)
+    # Test for Jacobian 1
+    test_matrix = isapprox.(orbit_0.jac_1, optvec_derivatives; rtol=epsilon)
 
     for i in eachindex(test_matrix)
             @test test_matrix[i]
