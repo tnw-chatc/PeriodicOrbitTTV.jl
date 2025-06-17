@@ -1,5 +1,5 @@
 using NbodyGradient: State, Elements, ElementsIC, InitialConditions, Derivatives
-using NbodyGradient: kepler, ekepler, zero_out!
+using NbodyGradient: kepler, ekepler, zero_out!, hierarchy
 using Rotations
 using LinearAlgebra: dot
 using Zygote
@@ -23,15 +23,16 @@ mutable struct Orbit{T<:Real}
     jac_1::Matrix{T} # Orbital elements to ElementsIC
     jac_2::Matrix{T} # ElementsIC to Cartesians
     jac_3::Matrix{T} # Time Evolution
-    jac_4::Matrix{T} # Final Cartesians to Final ElementsIC-ish
+    jac_4::Matrix{T} # Final Cartesians to Final ElementsIC matrix
+    jac_5::Matrix{T} # Final ElementsIC matrix to final orbital elements
 
     function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, 
-        jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}) where T <: Real
+        jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}, jac_5::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4, jac_5)
     end
 end
 
@@ -221,8 +222,63 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         return copy(state.jac_step)
     end
 
+    """Calculate Jacobian 5 (Final ElementsIC to orbital elements) using Finite Difference"""
+    function extract_elements(elems::Matrix{T}) where T <: Real
+        ic = ElementsIC(convert(T, 0.), nplanet+1, convert(Matrix{T}, elems))
+        s = State(ic)
+
+        # Extract orbital elements and anomalies
+        elems = get_orbital_elements(s, ic)
+        anoms = get_anomalies(s, ic)
+
+        e = [elems[i].e for i in eachindex(elems)[2:end]]
+        M = [anoms[i][2] for i in eachindex(anoms)[2:end]]
+        ωdiff = [elems[i].ω - elems[i-1].ω for i in eachindex(elems)[3:end]]
+
+        # Period ratio deviation
+        pratio_nom = Vector{T}(undef, nplanet-1)
+        pratio_nom[1] = orbparams.κ
     
+        for i = 2:nplanet-1
+            pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+        end 
+
+        pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
+        inner_period = elems[2].P
+
+        return vcat(e, M, ωdiff, pratiodev, inner_period)
+    end
+
+
+    function calculate_jac_fic_to_felems(elems_0::Matrix{T}) where T <: Real
+        epsilon = eps(Float64)
+
+        derivatives = []
+        # Slice out the first row and column (star and masses)
+        for i in 2:size(elems_0, 1), j in 2:size(elems_0, 2)
+
+            elems_pos = copy(elems_0)
+            elems_neg = copy(elems_0)
+
+            elems_pos[i,j] += epsilon
+            elems_neg[i,j] -= epsilon
+
+            jac_pos = extract_elements(elems_pos)
+            jac_neg = extract_elements(elems_neg)
+
+            derivative = reduce(vcat, eachcol((jac_pos - jac_neg) / (2 * epsilon)))
+            push!(derivatives, derivative)
+        end
+
+        derivatives = reduce(hcat, derivatives)
+        return derivatives
+    end
+
+    # Number of planets    
     nplanet = length(orbparams.mass)
+
+    # Hierarchy matrix
+    H = hierarchy([nplanet+1, ones(Int64,nplanet)...])
 
     # Deepcopy to preserve the original type as ForwardDiff mutates the function (somehow?)
     elem_mat = deepcopy(optparams_to_elementsIC(tovector(optparams)))
@@ -234,7 +290,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     s = State(ic)
 
     # Drop the star entries
-    elem_mat = elem_mat[2:end,:]
+    elem_mat_wo_star = elem_mat[2:end,:]
     jac_elems_to_ic = jac_elems_to_ic[setdiff(1:7*(nplanet+1), 1:nplanet+1:7*(nplanet+1)),:]
 
     # Define second Jacobian (ElementsIC to Cartesian)
@@ -245,14 +301,15 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Drop the star entries
     jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), convert(T, orbparams.tsys), get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
 
-    # Define fouth Jacobian (Final Cartesian to Final ElementsIC
+    # Define fouth Jacobian (Final Cartesian to Final ElementsIC)
     # Drop the star columns and mass rows
     # TODO: Make sure this is the right thing to do
     jac_fcart_to_fic = compute_cartesian_to_elements_jacobian(deepcopy(s), ic)[1][1:nplanet*6,8:end]
 
-    # Temporarily force promoting to BigFloat
-    # TODO: Remove force promotion
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, (jac_ic_to_cart), (jac_time_evolution), (jac_fcart_to_fic))
+    # Define the fifth Jacobian (Final ElementsIC to orbital elements)
+    jac_fic_to_felems = calculate_jac_fic_to_felems(deepcopy(elem_mat))
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic, jac_fic_to_felems)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
