@@ -15,7 +15,7 @@ export optimize!
 export normvec
 export mag
 export get_relative_positions, M2t0
-export extract_nbody_jacobians
+export extract_nbody_jacobians, compute_cartesian_to_elements_jacobian
 
 include("orbits.jl")
 include("elements.jl")

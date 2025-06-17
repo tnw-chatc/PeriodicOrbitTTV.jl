@@ -104,13 +104,14 @@ function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where 
     jac = zeros(T, n_elements_total, n_cartesian)
     
     # Finite difference over each Cartesian coordinate
-    for body in 1:n
+    for body in 2:n
         for coord in 1:7  # x, y, z, vx, vy, vz, m
             # Create perturbed state
             s_pert = deepcopy(s)
             ic_pert = deepcopy(ic)
             
             # Apply perturbation
+            # TODO: Implement central difference for better precision
             if coord <= 3  # Position
                 s_pert.x[coord, body] += δ
             elseif coord <= 6  # Velocity

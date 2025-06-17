@@ -23,13 +23,15 @@ mutable struct Orbit{T<:Real}
     jac_1::Matrix{T} # Orbital elements to ElementsIC
     jac_2::Matrix{T} # ElementsIC to Cartesians
     jac_3::Matrix{T} # Time Evolution
+    jac_4::Matrix{T} # Final Cartesians to Final ElementsIC-ish
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, 
+        jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4)
     end
 end
 
@@ -242,7 +244,12 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Drop the star entries
     jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
 
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution)
+    # Define fouth Jacobian (Final Cartesian to Final ElementsIC
+    # Drop the star columns and mass rows
+    # TODO: Make sure this is the right thing to do
+    jac_fcart_to_fic = compute_cartesian_to_elements_jacobian(deepcopy(s), ic)[1][1:nplanet*6,8:end]
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
