@@ -1,5 +1,5 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions
-using NbodyGradient: kepler, ekepler
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions, Derivatives
+using NbodyGradient: kepler, ekepler, zero_out!
 using Rotations
 using LinearAlgebra: dot
 using Zygote
@@ -22,13 +22,14 @@ mutable struct Orbit{T<:Real}
     elem_matrix::Matrix{T}
     jac_1::Matrix{T} # Orbital elements to ElementsIC
     jac_2::Matrix{T} # ElementsIC to Cartesians
+    jac_3::Matrix{T} # Time Evolution
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, jac_1::Matrix{T}, jac_2::Matrix{T}) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3)
     end
 end
 
@@ -195,7 +196,29 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
 
         return elem_matrix
     end 
+    
+    """An internal function to calculate time evolution jacobian (Jacobian 3)
+    
+    Use a deepcopied `State` only, as the integrator mutates the `State` object."""
+    function calculate_jac_time_evolution(state::State{T}, tsys::T, inn_period::T) where T <: Real
+        d = Derivatives(T, state.n)
 
+        step_size = 0.01 * inn_period
+        nsteps = ceil(Int, tsys / step_size)
+        h = tsys / nsteps
+        t_initial = s.t[1]
+        
+        zero_out!(d)
+        for i in 1:nsteps
+            ahl21!(state, d, h)
+            s.t[1] = t_initial + (i * h)
+        end        
+
+        # Return the time evolution jacobian (Jacobian 3)
+        return copy(state.jac_step)
+    end
+
+    
     nplanet = length(orbparams.mass)
 
     # Deepcopy to preserve the original type as ForwardDiff mutates the function (somehow?)
@@ -212,9 +235,14 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     jac_elems_to_ic = jac_elems_to_ic[setdiff(1:7*(nplanet+1), 1:nplanet+1:7*(nplanet+1)),:]
 
     # Define second Jacobian (ElementsIC to Cartesian)
+    # Drop the star entries
     jac_ic_to_cart = deepcopy(s.jac_init)[8:end, 8:end]
 
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart)
+    # Define third Jacobian (Time evolution)
+    # Drop the star entries
+    jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
