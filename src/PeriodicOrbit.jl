@@ -15,9 +15,11 @@ export optimize!
 export normvec
 export mag
 export get_relative_positions, M2t0
+export extract_nbody_jacobians
 
 include("orbits.jl")
 include("elements.jl")
 include("optimizer.jl")
+include("jacobians.jl")
 
 end # module PeriodicOrbit

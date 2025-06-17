@@ -19,15 +19,16 @@ mutable struct Orbit{T<:Real}
     ic::InitialConditions
     κ::T
     nplanet::Int
-    jac::Matrix{T}
     elem_matrix::Matrix{T}
+    jac_1::Matrix{T} # Orbital elements to ElementsIC
+    jac_2::Matrix{T} # ElementsIC to Cartesians
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, jac::Matrix{T}, elems::Matrix{T}) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, jac_1::Matrix{T}, jac_2::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet, jac, elems)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2)
     end
 end
 
@@ -150,8 +151,6 @@ Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectiv
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: Real = begin
 
-    # TODO: Might find a way to make this vector<->object conversion less awkward
-
     function optparams_to_elementsIC(optvec::Vector{T}) where T <: Real
         nplanet = length(orbparams.mass)
         optparams = OptimParameters(nplanet, optvec)
@@ -202,6 +201,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Deepcopy to preserve the original type as ForwardDiff mutates the function (somehow?)
     elem_mat = deepcopy(optparams_to_elementsIC(tovector(optparams)))
 
+    # Define first Jacobian (orbital elements to ElementsIC)
     jac_elems_to_ic = (p -> ForwardDiff.jacobian(optparams_to_elementsIC, p))(tovector(optparams))
 
     ic = ElementsIC(0., nplanet+1, Float64.(elem_mat))
@@ -211,7 +211,10 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     elem_mat = elem_mat[2:end,:]
     jac_elems_to_ic = jac_elems_to_ic[setdiff(1:7*(nplanet+1), 1:nplanet+1:7*(nplanet+1)),:]
 
-    Orbit(s, ic, orbparams.κ, jac_elems_to_ic, elem_mat)
+    # Define second Jacobian (ElementsIC to Cartesian)
+    jac_ic_to_cart = deepcopy(s.jac_init)[8:end, 8:end]
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
