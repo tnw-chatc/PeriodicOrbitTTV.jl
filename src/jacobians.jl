@@ -106,24 +106,32 @@ function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where 
     # Finite difference over each Cartesian coordinate
     for body in 2:n
         for coord in 1:7  # x, y, z, vx, vy, vz, m
-            # Create perturbed state
+            # Create perturbed state (central difference)
             s_pert = deepcopy(s)
             ic_pert = deepcopy(ic)
+
+            s_pert_neg = deepcopy(s)
+            ic_pert_neg = deepcopy(ic)
             
             # Apply perturbation
-            # TODO: Implement central difference for better precision
             if coord <= 3  # Position
                 s_pert.x[coord, body] += δ
+                s_pert_neg.x[coord, body] -= δ
             elseif coord <= 6  # Velocity
                 s_pert.v[coord-3, body] += δ
+                s_pert_neg.v[coord-3, body] -= δ
             else  # Mass (coord == 7)
                 s_pert.m[body] += δ
                 ic_pert.m[body] += δ
+
+                s_pert_neg.m[body] -= δ
+                ic_pert_neg.m[body] -= δ
             end
             
             # Get perturbed elements
             try
                 elements_pert = get_orbital_elements(s_pert, ic_pert)
+                elements_pert_neg = get_orbital_elements(s_pert_neg, ic_pert_neg)
                 
                 # Compute finite differences
                 cartesian_idx = (body-1)*7 + coord
@@ -134,8 +142,8 @@ function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where 
                     param_names = [:P, :t0, :ecosω, :esinω, :I, :Ω]
                     for (p, param) in enumerate(param_names)
                         element_idx = orbital_base_idx + p - 1
-                        if hasfield(typeof(elements_pert[b]), param) && hasfield(typeof(nominal_elements[b]), param)
-                            jac[element_idx, cartesian_idx] = (getfield(elements_pert[b], param) - getfield(nominal_elements[b], param)) / δ
+                        if hasfield(typeof(elements_pert[b]), param) && hasfield(typeof(elements_pert_neg[b]), param)
+                            jac[element_idx, cartesian_idx] = (getfield(elements_pert[b], param) - getfield(elements_pert_neg[b], param)) / (2 * δ)
                         end
                     end
                 end
@@ -143,7 +151,7 @@ function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where 
         
                 for b in 1:n
                     mass_idx = n_orbital_params + b
-                    jac[mass_idx, cartesian_idx] = (elements_pert[b].m - nominal_elements[b].m) / δ
+                    jac[mass_idx, cartesian_idx] = (elements_pert[b].m - elements_pert_neg[b].m) / (2 * δ)
                 end
             catch e
                 println("Warning: Error computing finite difference for body $body, coord $coord: $e")
