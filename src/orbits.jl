@@ -222,17 +222,19 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         return copy(state.jac_step)
     end
 
-    """Calculate Jacobian 5 (Final ElementsIC to orbital elements) using Finite Difference"""
+    # NOTE: I basically copied this snippet from `optimize.jl`. May have to refactor to take care of redundancy.
+    """Compute the optimization parameter based on `ElementsIC` matrixs, which will later be used in Finite Difference"""
     function extract_elements(elems::Matrix{T}) where T <: Real
         ic = ElementsIC(convert(T, 0.), nplanet+1, convert(Matrix{T}, elems))
         s = State(ic)
 
         # Extract orbital elements and anomalies
+        # Note that the index of `elems` has the star entries while `anoms` does not.
         elems = get_orbital_elements(s, ic)
         anoms = get_anomalies(s, ic)
 
         e = [elems[i].e for i in eachindex(elems)[2:end]]
-        M = [anoms[i][2] for i in eachindex(anoms)[2:end]]
+        M = [anoms[i][2] for i in eachindex(anoms)[2:end]] # We only need 2nd to nth mean anomalies
         ωdiff = [elems[i].ω - elems[i-1].ω for i in eachindex(elems)[3:end]]
 
         # Period ratio deviation
@@ -246,11 +248,15 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
         inner_period = elems[2].P
 
+        # Return the results as a vector
         return vcat(e, M, ωdiff, pratiodev, inner_period)
     end
 
 
+    """Calculate Jacobian 5 (final `ElementsIC` matrix to final orbital elements) using Finite Difference"""
     function calculate_jac_fic_to_felems(elems_0::Matrix{T}) where T <: Real
+        # Using machine precision in Float64
+        # NOTE: Should we ust `T` instead of just Float64 for BigFloat testing compatability?
         epsilon = eps(Float64)
 
         derivatives = []

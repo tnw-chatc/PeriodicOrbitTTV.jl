@@ -3,6 +3,7 @@ using NbodyGradient
 
 using Test
 
+# Test if Jacobian 1 from AutoDiff yields the same result as one from Finite Difference
 @testset "Jacobian 1" begin
     optvec_0 = BigFloat.([0.1, 0.2, 0.3, 0.4,
     2π, 1e-4, π/2,
@@ -42,10 +43,12 @@ using Test
 
     optvec_derivatives = reduce(hcat, optvec_derivatives)
 
-    # Test for Jacobian 1
+    # Test for Jacobian 1 -> Check if each element relative differs only up to the Float64 machine precision
     test_matrix = isapprox.(orbit_0.jac_1, optvec_derivatives; rtol=epsilon)
 
     for i in eachindex(test_matrix)
             @test test_matrix[i]
     end
 end
+
+# TODO: Implement a test to check if the COMBINED jacobians work as expected

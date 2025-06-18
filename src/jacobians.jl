@@ -208,7 +208,7 @@ function find_periodic_orbit_with_jacobians(optparams::OptimParameters{T}, orbpa
 
             final_elems = jacobians.final_elements
             
-           n
+            
             s_final = State(orbit.ic)
             s_final.x .= jacobians.final_state.x
             s_final.v .= jacobians.final_state.v
