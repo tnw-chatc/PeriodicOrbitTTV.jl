@@ -27,15 +27,17 @@ mutable struct Orbit{T<:Real}
     jac_5::Matrix{T} # Final ElementsIC matrix to final orbital elements
     jac_combined::Matrix{T} # Combined jacobians
 
+    final_elem_mat::Vector{T} # The extracted final orbital (optimization) elements for testing
+
     function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, 
-        jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}, jac_5::Matrix{T}) where T <: Real
+        jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}, jac_5::Matrix{T}, final_elem_mat::Vector{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
 
         jac_combined = jac_5 * jac_4 * jac_3 * jac_2 * jac_1 
     
-        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4, jac_5, jac_combined)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4, jac_5, jac_combined, final_elem_mat)
     end
 end
 
@@ -318,7 +320,11 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Define the fifth Jacobian (Final ElementsIC to orbital elements)
     jac_fic_to_felems = calculate_jac_fic_to_felems(deepcopy(elem_mat))
 
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic, jac_fic_to_felems)
+    # Export the final orbital elements
+    # NOTE: This matrix is for a testing purpose only, as the the final result needs to be from the optimization
+    final_elem_mat = extract_elements(deepcopy(elem_mat))
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic, jac_fic_to_felems, final_elem_mat)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
