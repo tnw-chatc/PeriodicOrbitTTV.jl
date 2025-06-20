@@ -25,14 +25,17 @@ mutable struct Orbit{T<:Real}
     jac_3::Matrix{T} # Time Evolution
     jac_4::Matrix{T} # Final Cartesians to Final ElementsIC matrix
     jac_5::Matrix{T} # Final ElementsIC matrix to final orbital elements
+    jac_combined::Matrix{T} # Combined jacobians
 
     function Orbit(s::State, ic::InitialConditions, κ::T, elems::Matrix{T}, 
         jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, jac_4::Matrix{T}, jac_5::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
+
+        jac_combined = jac_5 * jac_4 * jac_3 * jac_2 * jac_1 
     
-        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4, jac_5)
+        new{T}(s, ic, κ, nplanet, elems, jac_1, jac_2, jac_3, jac_4, jac_5, jac_combined)
     end
 end
 
