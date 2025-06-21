@@ -215,24 +215,20 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         step_size = 0.01 * inn_period
         nsteps = ceil(Int, tsys / step_size)
         h = tsys / nsteps
-        t_initial = s.t[1]
+        t_initial = state.t[1]
         
         zero_out!(d)
         for i in 1:nsteps
             ahl21!(state, d, h)
-            s.t[1] = t_initial + (i * h)
+            state.t[1] = t_initial + (i * h)
         end        
 
         # Return the time evolution jacobian (Jacobian 3)
-        return copy(state.jac_step)
+        return copy(state.jac_step), state
     end
 
-    # NOTE: I basically copied this snippet from `optimize.jl`. May have to refactor to take care of redundancy.
-    """Compute the optimization parameter based on `ElementsIC` matrixs, which will later be used in Finite Difference"""
-    function extract_elements(elems::Matrix{T}) where T <: Real
-        ic = ElementsIC(convert(T, 0.), nplanet+1, convert(Matrix{T}, elems))
-        s = State(ic)
-
+    # Alternative function
+    function extract_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real
         # Extract orbital elements and anomalies
         # Note that the index of `elems` has the star entries while `anoms` does not.
         elems = get_orbital_elements(s, ic)
@@ -255,6 +251,15 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
 
         # Return the results as a vector
         return vcat(e, M, ωdiff, pratiodev, inner_period)
+    end
+
+    # NOTE: I basically copied this snippet from `optimize.jl`. May have to refactor to take care of redundancy.
+    """Compute the optimization parameter based on `ElementsIC` matrixs, which will later be used in Finite Difference"""
+    extract_elements(elems::Matrix{T}) where T <: Real = begin
+        ic = ElementsIC(convert(T, 0.), nplanet+1, convert(Matrix{T}, elems))
+        s = State(ic)
+
+        extract_elements(s, ic)
     end
 
 
@@ -304,27 +309,33 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     elem_mat_wo_star = elem_mat[2:end,:]
     jac_elems_to_ic = jac_elems_to_ic[setdiff(1:7*(nplanet+1), 1:nplanet+1:7*(nplanet+1)),:]
 
+    # Reorder the rows such that it's a group of 7 elements
+    jac_elems_to_ic = reduce(vcat, [jac_elems_to_ic[ii:nplanet:end,:] for ii in 1:nplanet])
+
     # Define second Jacobian (ElementsIC to Cartesian)
     # Drop the star entries
     jac_ic_to_cart = deepcopy(s.jac_init)[8:end, 8:end]
 
-    # Define third Jacobian (Time evolution)
+    # Define third Jacobian (Time evolution) and return final `State` object
     # Drop the star entries
-    jac_time_evolution = calculate_jac_time_evolution(deepcopy(s), convert(T, orbparams.tsys), get_orbital_elements(s, ic)[2].P)[8:end, 8:end]
+    jac_time_evolution, s_f = calculate_jac_time_evolution(deepcopy(s), convert(T, orbparams.tsys), get_orbital_elements(s, ic)[2].P)
+    jac_time_evolution = jac_time_evolution[8:end, 8:end]
 
     # Define fouth Jacobian (Final Cartesian to Final ElementsIC)
     # Drop the star columns and mass rows
     # TODO: Make sure this is the right thing to do
-    jac_fcart_to_fic = compute_cartesian_to_elements_jacobian(deepcopy(s), ic)[1][1:nplanet*6,8:end]
+    jac_fcart_to_fic = compute_cartesian_to_elements_jacobian(deepcopy(s_f), ic)[1][1:nplanet*6,8:end]
 
-    # Define the fifth Jacobian (Final ElementsIC to orbital elements)
-    jac_fic_to_felems = calculate_jac_fic_to_felems(deepcopy(elem_mat))
+    final_orb_elems = extract_elements(deepcopy(s_f), ic)
 
     # Export the final orbital elements
     # NOTE: This matrix is for a testing purpose only, as the the final result needs to be from the optimization
-    final_elem_mat = extract_elements(deepcopy(elem_mat))
+    final_elem_mat = convert_sic_to_elemmat(s_f, ic)
 
-    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic, jac_fic_to_felems, final_elem_mat)
+    # Define the fifth Jacobian (Final ElementsIC to orbital elements)
+    jac_fic_to_felems = calculate_jac_fic_to_felems(deepcopy(final_elem_mat))
+
+    Orbit(s, ic, orbparams.κ, elem_mat, jac_elems_to_ic, jac_ic_to_cart, jac_time_evolution, jac_fcart_to_fic, jac_fic_to_felems, final_orb_elems)
 end
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
@@ -351,4 +362,24 @@ function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
 
     # Negates the time since we want to reverse it
     return -tp
+end
+
+
+"""A helper function for converting state and ic to elem matrix
+
+NOTE: The star row is quite arbitrary. But it will eventually discarded, so it's just there as a placeholder."""
+function convert_sic_to_elemmat(s::State{T}, ic::InitialConditions{T}) where T <: Real
+    nplanet = s.n - 1
+
+    elems = get_orbital_elements(s, ic)[2:end]
+    mean_anoms = [get_anomalies(s, ic)[i][2] for i in 1:nplanet]
+
+    t0_init = [M2t0(mean_anoms[i], elems[i].e, elems[i].P, elems[i].ω) for i in 1:nplanet]
+
+    star_elem = [[1., 0., 0., 0., 0., 0., 0.]]
+    mat = vcat([
+        [ic.m[i+1], elems[i].P, t0_init[i] + s.t[1], elems[i].e*cos(elems[i].ω), elems[i].e*sin(elems[i].ω), π/2, 0.] for i in 1:nplanet
+    ])
+
+    mmat = reduce(vcat, vcat(star_elem, mat)')
 end

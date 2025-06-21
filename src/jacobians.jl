@@ -129,34 +129,23 @@ function compute_cartesian_to_elements_jacobian(s::State{T}, ic, δ=1e-8) where 
             end
             
             # Get perturbed elements
-            try
-                elements_pert = get_orbital_elements(s_pert, ic_pert)
-                elements_pert_neg = get_orbital_elements(s_pert_neg, ic_pert_neg)
+            # TODO: Make sure it works as expected
+            elements_pert = convert_sic_to_elemmat(s_pert, ic_pert)
+            elements_pert_neg = convert_sic_to_elemmat(s_pert_neg, ic_pert_neg)
+
+            # Compute finite differences
+            cartesian_idx = (body-1)*7 + coord
+            
+            for b in 2:n
+                orbital_base_idx = (b-2)*6 + 1
                 
-                # Compute finite differences
-                cartesian_idx = (body-1)*7 + coord
-                
-                for b in 2:n
-                    orbital_base_idx = (b-2)*6 + 1
-                    
-                    param_names = [:P, :t0, :ecosω, :esinω, :I, :Ω]
-                    for (p, param) in enumerate(param_names)
-                        element_idx = orbital_base_idx + p - 1
-                        if hasfield(typeof(elements_pert[b]), param) && hasfield(typeof(elements_pert_neg[b]), param)
-                            jac[element_idx, cartesian_idx] = (getfield(elements_pert[b], param) - getfield(elements_pert_neg[b], param)) / (2 * δ)
-                        end
-                    end
+                for (p, _) in enumerate(eachcol(elements_pert))
+                    element_idx = orbital_base_idx + p - 1
+                    jac[element_idx, cartesian_idx] = (elements_pert[b, p] - elements_pert_neg[b, p]) / (2*δ)
                 end
-                
-        
-                for b in 1:n
-                    mass_idx = n_orbital_params + b
-                    jac[mass_idx, cartesian_idx] = (elements_pert[b].m - elements_pert_neg[b].m) / (2 * δ)
-                end
-            catch e
-                println("Warning: Error computing finite difference for body $body, coord $coord: $e")
-       
+
             end
+
         end
     end
     
