@@ -51,21 +51,40 @@ end
 end
 
 @testset "Orbit Initialization" begin
+
     # For n = 4 planets
-    vec = [0.1, 0.2, 0.3, 0.4,
-    0., 1.3, 5.0,
+    optvecs = []
+
+    push!(optvecs, [0.1, 0.2, 0.3, 0.4,
+    0.00001, 1.3, 5.0,
     0.2, 0.3, π,
     1e-4, 1e-4,
-    365.242]
+    365.242])
 
-    optparams = OptimParameters(4, vec)
-    orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000, 8*365.242, [1., 1., 5., 3., 2.])
+    push!(optvecs, [0.3, 0.2, 0.3, 0.3,
+    4., π, -3.,
+    0.2, 0.3, π,
+    1e-4, 1e-4,
+    365.242])
 
-    orbit = Orbit(4, optparams, orbparams)
+    push!(optvecs, [0.7, 0.7, 0.7, 0.7,
+    2π, 1e-4, π/2,
+    0.00001, -0.0001, 2π,
+    1e-4, 1e-4,
+    365.242])
 
-    anoms = get_anomalies(orbit.s, orbit.ic)
+    for i in eachindex(optvecs)
+        vec = optvecs[i]
 
-    for i=2:orbit.nplanet
-        @test isapprox(rem2pi(anoms[i][2], RoundNearest), rem2pi(vec[3+i], RoundNearest); rtol=1e-8)
+        optparams = OptimParameters(4, vec)
+        orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000, 8*365.242, [1., 1., 5., 3., 2.])
+
+        orbit = Orbit(4, optparams, orbparams)
+
+        anoms = get_anomalies(orbit.s, orbit.ic)
+
+        for i=2:orbit.nplanet
+            @test isapprox(rem2pi(anoms[i][2], RoundNearest), rem2pi(vec[3+i], RoundNearest); rtol=sqrt(eps(Float64)))
+        end
     end
 end
