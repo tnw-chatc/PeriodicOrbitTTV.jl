@@ -3,8 +3,10 @@ using NbodyGradient: kepler, ekepler
 using Rotations
 using LinearAlgebra: dot
 
+using ForwardDiff
+
 """
-    Orbit{T<:AbstractFloat}
+    Orbit{T<:Real}
 
 Orbit object encapsulates the information about `State` and `InittialConditions` of the system
 
@@ -13,23 +15,25 @@ Orbit object encapsulates the information about `State` and `InittialConditions`
 - `ic::InitialConditions` : `InitialConditions` object of the system.
 - `nplanet::Int` : The number of the planets in the system
 """
-mutable struct Orbit{T<:AbstractFloat}
+mutable struct Orbit{T<:Real}
     s::State
     ic::InitialConditions
     κ::T
     nplanet::Int
 
-    function Orbit(s::State, ic::InitialConditions, κ::T) where T <: AbstractFloat
+    jac_1::Matrix{T} # Orbital elements to Cartesian
+
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet)
+        new{T}(s, ic, κ, nplanet, jac_1)
     end
 end
 
 """Optimization parameters."""
-@kwdef struct OptimParameters{T<:AbstractFloat}
+@kwdef struct OptimParameters{T<:Real}
     e::Vector{T}
     M::Vector{T}
     Δω::Vector{T}
@@ -57,7 +61,7 @@ vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities
 ```
 Note that `vec::Vector{T}` must be consistent with the given the number of planets.
 """
-function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
+function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     if N == 2
         OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
@@ -78,10 +82,10 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: AbstractFloat
 end
 
 # Converts OptimParameters to a vector
-tovector(x::OptimParameters) = [getfield(x, field) for field in fieldnames(typeof(x))]
+tovector(x::OptimParameters) = reduce(vcat, [getfield(x, field) for field in fieldnames(typeof(x))])
 
 """
-    OrbitParameters{T<:AbstractFloat}
+    OrbitParameters{T<:Real}
 
 Orbital parameters that will not be affected by the optimization
 
@@ -104,7 +108,7 @@ OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4],   # Masses of the planets
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
 
 """
-@kwdef struct OrbitParameters{T<:AbstractFloat}
+@kwdef struct OrbitParameters{T<:Real}
     mass::Vector{T}
     cfactor::Vector{T}
     κ::T
@@ -113,7 +117,7 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 end
 
 """
-    Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat
+    Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: Real
 
 Main constructor for Orbit object. Access states and initial conditions of the system via `s` and `ic` attributes.
 
@@ -145,9 +149,33 @@ orbit = Orbit(4, optparams, orbparams)
 
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
 """
-Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
+Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real} = begin
 
-    nplanet = length(orbparams.mass)
+    optvec = tovector(optparams)
+    periods, mean_anoms, omegas = compute_system_init(optvec, orbparams)
+
+    pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+
+    positions = hcat(pos_star, pos) 
+    velocities = hcat(vel_star, vel)
+
+    ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
+
+    ic = CartesianIC(0., n+1, permutedims(ic_mat))
+    s = State(ic)
+
+    # Compute derivatives (Jac 1)
+    J = compute_derivative_system_init(optvec, orbparams)
+
+    Orbit(s, ic, orbparams.κ, J)
+end
+
+"""Calculate the system initialization based on optvec (a plain, vectorized version of OptimParameters object)"""
+function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real}
+
+    n = length(orbparams.mass)
+
+    optparams = OptimParameters(n, optvec)
 
     # Initializes arrays
     periods = Vector{T}(undef, n)
@@ -174,18 +202,33 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
         omegas[i] = optparams.Δω[i-1] + omegas[i-1]
     end
 
-    pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+    return periods, mean_anoms, omegas
 
-    positions = hcat(pos_star, pos) 
-    velocities = hcat(vel_star, vel)
-
-    ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
-
-    ic = CartesianIC(0., nplanet+1, permutedims(ic_mat))
-    s = State(ic)
-
-    Orbit(s, ic, orbparams.κ)
 end
+
+function compute_derivative_system_init(optvec, orbparams)
+
+    # Function for AutoDiff
+    function f(x)
+        optparams = OptimParameters(length(orbparams.mass), x)
+
+        periods, mean_anoms, omegas = compute_system_init(x, orbparams)
+        
+        pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+
+        positions = hcat(pos_star, pos) 
+        velocities = hcat(vel_star, vel)
+
+        mat = vcat(vcat(positions, velocities), vcat(1., orbparams.mass)')
+
+        return mat
+    end
+
+    J = ForwardDiff.jacobian(f, optvec)
+
+    return J
+end
+
 
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     println("Orbit")
@@ -196,7 +239,7 @@ Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
 end
 
 """Calculates t0 offset to correct initialization on the x-axis"""
-function M2t0(target_M::T, e::T, P::T, ω::T) where T <: AbstractFloat
+function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
     # Offsetting true anomaly
     f = ω + pi/2
 

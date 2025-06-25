@@ -20,7 +20,7 @@ Convert orbital elements to Cartesian coordinates for a planetary system.
 - `star_pos`: 3-element vector of star position in center-of-mass frame (AU)
 - `star_vel`: 3-element vector of star velocity in center-of-mass frame (AU/day)
 """
-function orbital_to_cartesian(masses::Vector{T}, periods::Vector{T}, mean_anomalies::Vector{T}, longitudes_periastron::Vector{T}, eccentricities::Vector{T}; M_star=1.0) where {T <: Real}
+function orbital_to_cartesian(masses::Vector{U}, periods::Vector{T}, mean_anomalies::Vector{T}, longitudes_periastron::Vector{T}, eccentricities::Vector{T}; M_star=1.0) where {T <: Real, U <: Real}
     n_planets = length(masses)
     
     # Initialize output arrays with the same type, T, as the input vectors:

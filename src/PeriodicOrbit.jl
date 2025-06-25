@@ -11,7 +11,7 @@ export convert_to_elements, get_orbital_elements, get_anomalies, find_periodic_o
 export integrate_to_M!
 export optimize!
 
-export orbital_to_cartesian
+export orbital_to_cartesian, compute_derivatives
 
 # For debugging
 export normvec
