@@ -1,4 +1,4 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC
 using NbodyGradient: kepler, ekepler
 using Rotations
 using LinearAlgebra: dot
@@ -147,16 +147,15 @@ Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectiv
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) where T <: AbstractFloat = begin
 
+    nplanet = length(orbparams.mass)
+
     # Initializes arrays
-    t0_init = Vector{T}(undef, n)
     periods = Vector{T}(undef, n)
     omegas = Vector{T}(undef, n)
-    planets = Vector{Elements}(undef, n)
 
     pratio_nom = Vector{T}(undef, n-1)
     pratio_nom[1] = orbparams.κ
     
-    # TODO: Properly implement this
     for i = 2:n-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
     end 
@@ -164,27 +163,25 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{T}) wher
     # Fills in missing M
     mean_anoms = vcat(0.0, optparams.M)
 
+    # Fill in Period ratio deviation for later use
+    period_dev = vcat(0.0, optparams.Pratio)
+
     # Calculates the actual ω's from Δω and periods
     omegas[1] = 0.
     periods[1] = optparams.inner_period
     for i = 2:n
-        periods[i] = pratio_nom[i-1] * periods[i-1]
+        periods[i] = (pratio_nom[i-1] + period_dev[i-1]) * periods[i-1]
         omegas[i] = optparams.Δω[i-1] + omegas[i-1]
     end
 
-    # Calculates t0 for initialization
-    for i = 1:n
-        t0_init[i] = M2t0(mean_anoms[i], optparams.e[i], periods[i], omegas[i])
-    end
+    pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
 
-    # Primary object
-    star = Elements(m=1.)
+    positions = hcat(pos_star, pos) 
+    velocities = hcat(vel_star, vel)
 
-    for i = 1:n 
-        planets[i] = Elements(m=orbparams.mass[i], P=periods[i], e=optparams.e[i], ω=omegas[i], I=π/2, t0=t0_init[i])
-    end
+    ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
 
-    ic = ElementsIC(0., n+1, star, planets...)
+    ic = CartesianIC(0., nplanet+1, permutedims(ic_mat))
     s = State(ic)
 
     Orbit(s, ic, orbparams.κ)
