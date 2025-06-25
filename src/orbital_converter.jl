@@ -26,6 +26,10 @@ function orbital_to_cartesian(masses::Vector{U}, periods::Vector{T}, mean_anomal
     # Initialize output arrays with the same type, T, as the input vectors:
     positions = zeros(T,3, n_planets)
     velocities = zeros(T,3, n_planets)
+
+    # rel_mass = get_relative_masses(masses)
+
+    rel_mass = [1. + masses[i] for i in 1:n_planets] .* 39.4845/(365.242 * 365.242)
     
     # Convert orbital elements to Cartesian for each planet
     for i in 1:n_planets
@@ -33,8 +37,8 @@ function orbital_to_cartesian(masses::Vector{U}, periods::Vector{T}, mean_anomal
         # P² = (4π²/G(M_star + m_planet)) * a³
         # With units: P in days, M in solar masses, a in AU
         # G = 4π²/(365.25²) in AU³/(solar mass × day²)
-        G_units = 4π^2 / (365.25^2)  # AU³/(M_sun × day²)
-        a = ((periods[i]^2 * G_units * (M_star + masses[i])) / (4π^2))^(1/3)
+        G_units = 39.4845/(365.242 * 365.242)  # AU³/(M_sun × day²)
+        a = ((periods[i]^2 * rel_mass[i]) / (4π^2))^(1/3)
         
         # Solve Kepler's equation for eccentric anomaly
         E = solve_kepler_equation(mean_anomalies[i], eccentricities[i])
@@ -50,10 +54,10 @@ function orbital_to_cartesian(masses::Vector{U}, periods::Vector{T}, mean_anomal
         y_orb = r * sin(ν)
         
         # Velocity in orbital plane
-        h = sqrt(G_units * (M_star + masses[i]) * a * (1 - eccentricities[i]^2))  # specific angular momentum
-        vx_orb = -h * sin(ν) / r
-        vy_orb = h * (eccentricities[i] + cos(ν)) / r
-        
+        h = sqrt(rel_mass[i] * a * (1 - eccentricities[i]^2))  # specific angular momentum
+        vx_orb = -h * sin(E) / (r * sqrt(1 - eccentricities[i]^2))
+        vy_orb = h * cos(E) / r
+
         # For plane-parallel system, we only need rotation by longitude of periastron
         ω = longitudes_periastron[i]
         cos_ω = cos(ω)
@@ -98,7 +102,7 @@ function solve_kepler_equation(M::T, ecc::T; max_iter=100) where {T <: Real}
         E_new = E - f / fp
         
         if E_new == E || E_new == E_old
-            println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
+            # println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
             return E_new
         end
         E_old = E

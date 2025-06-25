@@ -23,13 +23,19 @@ mutable struct Orbit{T<:Real}
 
     jac_1::Matrix{T} # Orbital elements to Cartesian
     jac_2::Matrix{T} # Time evolution
+    jac_3::Matrix{T} # Cartesian back to final orbital elements
+    jac_combined::Matrix{T} # Combined jacobian J3 * J2 * J1
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}) where T <: Real
+    final_elem::Vector{T}
+
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, final_elem::Vector{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
+
+        jac_combined = jac_3 * jac_2 * jac_1
     
-        new{T}(s, ic, κ, nplanet, jac_1, jac_2)
+        new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem)
     end
 end
 
@@ -162,7 +168,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
 
     ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
 
-    ic = CartesianIC(0., n+1, permutedims(ic_mat))
+    ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
     # Compute derivatives (Jac 1)
@@ -171,7 +177,13 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     # Compute time evolution Jacobian (Jac 2)
     jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
 
-    Orbit(s, ic, orbparams.κ, jac_1, jac_2)
+    # Export the elements for testing later
+    final_elem = extract_elements(deepcopy(s), ic, orbparams)
+
+    # Compute derivatives (Jac 3)
+    jac_3 = compute_jac_final(s_final, ic, orbparams)
+
+    Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem)
 end
 
 """Calculate the system initialization based on optvec (a plain, vectorized version of OptimParameters object)"""
@@ -252,8 +264,56 @@ function calculate_jac_time_evolution(state::State{T}, tsys::T, inn_period::T) w
         state.t[1] = t_initial + (i * h)
     end        
 
+    # Integrator(ahl21!, convert(T, 1.), convert(T, 0.), tsys)(state)
+
     # Return the time evolution jacobian (Jacobian 2)
     return copy(state.jac_step), state
+end
+
+
+"""Extract optimization state parameters from `State` and `InitialConditions`"""
+function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbparams) where T <: Real
+    nplanet = length(masses) - 1
+
+    # Extract orbital elements and anomalies
+    elems = get_orbital_elements(x, v, masses)
+    anoms = get_anomalies(x, v, masses)
+
+    e = [elems[i].e for i in eachindex(elems)[2:end]]
+    M = [anoms[i][2] for i in eachindex(anoms)[2:end]]
+    ωdiff = [elems[i].ω - elems[i-1].ω for i in eachindex(elems)[3:end]]
+
+    # Period ratio deviation
+    pratio_nom = Vector{T}(undef, nplanet-1)
+    pratio_nom[1] = orbparams.κ
+
+    for i = 2:nplanet-1
+        pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
+    end 
+
+    pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
+    inner_period = elems[2].P
+
+    return vcat(e, M, ωdiff, pratiodev, inner_period)
+end
+
+extract_elements(s::State{T}, ic::InitialConditions{T}, orbparams::OrbitParameters{T}) where T <: Real = extract_elements(s.x, s.v, ic.m, orbparams)
+
+function compute_jac_final(s::State{T}, ic::InitialConditions{T}, orbparams::OrbitParameters{T}) where T <: Real
+    input_mat = vcat(s.x, s.v, ic.m')
+
+    # Function for Jacobian 3
+    function f(input)
+        xx = input[1:3,:]
+        vv = input[4:6,:]
+        masses = input[7,:]
+
+        return extract_elements(xx, vv, masses, orbparams)
+    end
+
+    J = ForwardDiff.jacobian(f, input_mat)
+
+    return J
 end
 
 

@@ -16,7 +16,7 @@ export orbital_to_cartesian, compute_derivatives
 # For debugging
 export normvec
 export mag
-export get_relative_positions, M2t0
+export get_relative_positions, get_relative_masses, M2t0
 
 include("orbits.jl")
 include("elements.jl")

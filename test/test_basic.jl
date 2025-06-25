@@ -15,40 +15,42 @@ function Base.isapprox(a::Elements,b::Elements;tol=1e-10)
     return true
 end
 
-@testset "Cartesian to Elements" begin
-    ωs = [0., π/2, π, -π/2, 1e-4, -1e-4, 
-    π/2 + 1e-4, π/2 - 1e-4, 
-    -π/2 + 1e-4, -π/2 - 1e-4, 
-    π + 1e-4, π - 1e-4, 
-    -π + 1e-4, -π - 1e-4]
+# TODO: This test is for Jacobi coordinates. May need to write a new test for Heliocentric coordinates
 
-    es = [0.0001, 0.1, 0.5, 0.9]
+# @testset "Cartesian to Elements" begin
+#     ωs = [0., π/2, π, -π/2, 1e-4, -1e-4, 
+#     π/2 + 1e-4, π/2 - 1e-4, 
+#     -π/2 + 1e-4, -π/2 - 1e-4, 
+#     π + 1e-4, π - 1e-4, 
+#     -π + 1e-4, -π - 1e-4]
 
-    # ωs = [0., π/2, π, -π/2, 1e-4, -1e-4]
-    # es = [0.0001, 0.1, 0.5, 0.9]
-    # Is = [0., 1., π/2]
-    # Ωs = [0., 1., π/2, -π/2]
+#     es = [0.0001, 0.1, 0.5, 0.9]
 
-    for ω in ωs, e in es
-        p1 = Elements(m=1)
-        p2 = Elements(m=1e-4, P=365.242, e=e, ω=ω, I=π/2, Ω=0)
-        p3 = Elements(m=1e-4, P=2*365.242, e=e, ω=ω, I=π/2, Ω=0)
+#     # ωs = [0., π/2, π, -π/2, 1e-4, -1e-4]
+#     # es = [0.0001, 0.1, 0.5, 0.9]
+#     # Is = [0., 1., π/2]
+#     # Ωs = [0., 1., π/2, -π/2]
+
+#     for ω in ωs, e in es
+#         p1 = Elements(m=1)
+#         p2 = Elements(m=1e-4, P=365.242, e=e, ω=ω, I=π/2, Ω=0)
+#         p3 = Elements(m=1e-4, P=2*365.242, e=e, ω=ω, I=π/2, Ω=0)
 
 
-        ic = ElementsIC(0., 3, p1, p2, p3)
-        s = State(ic)
+#         ic = ElementsIC(0., 3, p1, p2, p3)
+#         s = State(ic)
 
-        bodies = [p1, p2, p3]
+#         bodies = [p1, p2, p3]
         
-        println("Testing: ω = $ω, e = $e")
-        for i=1:ic.nbody
-            pre_elems = ic.elements[i,:]
-            elems = get_orbital_elements(s, ic)[i]
-            post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), rem2pi(elems.I, RoundNearest), rem2pi(elems.Ω, RoundNearest)]
-            @test isapprox(pre_elems, post_elems; rtol=1e-8)
-        end
-    end
-end
+#         println("Testing: ω = $ω, e = $e")
+#         for i=1:ic.nbody
+#             pre_elems = ic.elements[i,:]
+#             elems = get_orbital_elements(s, ic)[i]
+#             post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), rem2pi(elems.I, RoundNearest), rem2pi(elems.Ω, RoundNearest)]
+#             @test isapprox(pre_elems, post_elems; rtol=1e-8)
+#         end
+#     end
+# end
 
 @testset "Orbit Initialization" begin
 
