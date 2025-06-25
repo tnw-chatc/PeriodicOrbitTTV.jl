@@ -1,5 +1,5 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC
-using NbodyGradient: kepler, ekepler
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC, Derivatives
+using NbodyGradient: kepler, ekepler, zero_out!
 using Rotations
 using LinearAlgebra: dot
 
@@ -22,13 +22,14 @@ mutable struct Orbit{T<:Real}
     nplanet::Int
 
     jac_1::Matrix{T} # Orbital elements to Cartesian
+    jac_2::Matrix{T} # Time evolution
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
     
-        new{T}(s, ic, κ, nplanet, jac_1)
+        new{T}(s, ic, κ, nplanet, jac_1, jac_2)
     end
 end
 
@@ -165,9 +166,12 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     s = State(ic)
 
     # Compute derivatives (Jac 1)
-    J = compute_derivative_system_init(optvec, orbparams)
+    jac_1 = compute_derivative_system_init(optvec, orbparams)
 
-    Orbit(s, ic, orbparams.κ, J)
+    # Compute time evolution Jacobian (Jac 2)
+    jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
+
+    Orbit(s, ic, orbparams.κ, jac_1, jac_2)
 end
 
 """Calculate the system initialization based on optvec (a plain, vectorized version of OptimParameters object)"""
@@ -206,6 +210,7 @@ function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) w
 
 end
 
+"""Compute Jacobian 1 (orbital elements to Cartesians)"""
 function compute_derivative_system_init(optvec, orbparams)
 
     # Function for AutoDiff
@@ -227,6 +232,28 @@ function compute_derivative_system_init(optvec, orbparams)
     J = ForwardDiff.jacobian(f, optvec)
 
     return J
+end
+
+"""Compute Jacobian 2 (Cartesian time evolution)
+
+Use a deepcopied `State` only, as the integrator mutates the `State` object."""
+function calculate_jac_time_evolution(state::State{T}, tsys::T, inn_period::T) where T <: Real
+    d = Derivatives(T, state.n)
+
+    # TODO: Do we really need to loop through every step?
+    step_size = 0.01 * inn_period
+    nsteps = ceil(Int, tsys / step_size)
+    h = tsys / nsteps
+    t_initial = state.t[1]
+    
+    zero_out!(d)
+    for i in 1:nsteps
+        ahl21!(state, d, h)
+        state.t[1] = t_initial + (i * h)
+    end        
+
+    # Return the time evolution jacobian (Jacobian 2)
+    return copy(state.jac_step), state
 end
 
 
