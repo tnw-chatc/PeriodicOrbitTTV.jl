@@ -27,15 +27,16 @@ mutable struct Orbit{T<:Real}
     jac_combined::Matrix{T} # Combined jacobian J3 * J2 * J1
 
     final_elem::Vector{T}
+    state_final::State # State after integration for testing only
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, final_elem::Vector{T}) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, final_elem::Vector{T}, state_final::State) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
 
         jac_combined = jac_3 * jac_2 * jac_1
     
-        new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem)
+        new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem, state_final)
     end
 end
 
@@ -178,12 +179,12 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
 
     # Export the elements for testing later
-    final_elem = extract_elements(deepcopy(s), ic, orbparams)
+    final_elem = extract_elements(deepcopy(s_final), ic, orbparams)
 
     # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
-    Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem)
+    Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem, s_final)
 end
 
 """Calculate the system initialization based on optvec (a plain, vectorized version of OptimParameters object)"""
