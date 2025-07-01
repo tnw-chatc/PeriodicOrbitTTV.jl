@@ -11,9 +11,18 @@ using ForwardDiff
 Orbit object encapsulates the information about `State` and `InittialConditions` of the system
 
 # Fields
-- `s::State` : `State` object of the system
+- `s::State` : `State` object of the system.
 - `ic::InitialConditions` : `InitialConditions` object of the system.
-- `nplanet::Int` : The number of the planets in the system
+- `κ::T` : The κ constant for a family of the periodic orbit.
+- `nplanet::Int` : The number of the planets in the system.
+
+- `jac_1::Matrix{T}` : The Jacobian for Orbital elements to Cartesian conversion
+- `jac_2::Matrix{T}` : The Jacobian for Time Evolution (imported from `NbodyGradient.jl`)
+- `jac_3::Matrix{T}` : The Jacobian for Cartesian to Orbital elements conversion
+- `jac_combined::Matrix{T}` : The combined Jacobian of the final elements w.r.t. initial elements
+
+- `final_elem::Vector{T}` : The final orbital elements after `tsys`
+- `state_final::State` : The `State` structure corresponding to `final_elem`
 """
 mutable struct Orbit{T<:Real}
     s::State
@@ -155,7 +164,9 @@ orbparams = OrbitParameters([3e-6, 5e-6, 7e-5, 3e-5], [0.5, 0.5], 2.000, 8*365.2
 orbit = Orbit(4, optparams, orbparams)
 ```
 
-Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively.
+Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively. 
+The Jacobians of the optimization can be called from fields `jac_1`, `jac_2`, `jac_3`, and `jac_combined`.
+The final orbital elements and its `State` can also be called from `Orbit` structure.
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real} = begin
 
@@ -187,7 +198,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem, s_final)
 end
 
-"""Calculate the system initialization based on optvec (a plain, vectorized version of OptimParameters object)"""
+"""Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
 function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real}
 
     n = length(orbparams.mass)
@@ -298,8 +309,10 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     return vcat(e, M, ωdiff, pratiodev, inner_period)
 end
 
+# Allow calling the function using `State` and `ic` instead of Cartesians
 extract_elements(s::State{T}, ic::InitialConditions{T}, orbparams::OrbitParameters{T}) where T <: Real = extract_elements(s.x, s.v, ic.m, orbparams)
 
+"""Compute Jacobian 3 (Cartesians back to orbital elements)"""
 function compute_jac_final(s::State{T}, ic::InitialConditions{T}, orbparams::OrbitParameters{T}) where T <: Real
     input_mat = vcat(s.x, s.v, ic.m')
 
