@@ -3,55 +3,6 @@ using NbodyGradient
 using LinearAlgebra: dot, cross
 using Test
 
-function Base.isapprox(a::Elements,b::Elements;tol=1e-10)
-    fields = setdiff(fieldnames(Elements),[:a,:e,:ϖ])
-    for i in fields
-        af = getfield(a,i)
-        bf = getfield(b,i)
-        if abs(af - bf) > tol
-            return false
-        end
-    end
-    return true
-end
-
-# TODO: This test is for Jacobi coordinates. May need to write a new test for Heliocentric coordinates
-
-# @testset "Cartesian to Elements" begin
-#     ωs = [0., π/2, π, -π/2, 1e-4, -1e-4, 
-#     π/2 + 1e-4, π/2 - 1e-4, 
-#     -π/2 + 1e-4, -π/2 - 1e-4, 
-#     π + 1e-4, π - 1e-4, 
-#     -π + 1e-4, -π - 1e-4]
-
-#     es = [0.0001, 0.1, 0.5, 0.9]
-
-#     # ωs = [0., π/2, π, -π/2, 1e-4, -1e-4]
-#     # es = [0.0001, 0.1, 0.5, 0.9]
-#     # Is = [0., 1., π/2]
-#     # Ωs = [0., 1., π/2, -π/2]
-
-#     for ω in ωs, e in es
-#         p1 = Elements(m=1)
-#         p2 = Elements(m=1e-4, P=365.242, e=e, ω=ω, I=π/2, Ω=0)
-#         p3 = Elements(m=1e-4, P=2*365.242, e=e, ω=ω, I=π/2, Ω=0)
-
-
-#         ic = ElementsIC(0., 3, p1, p2, p3)
-#         s = State(ic)
-
-#         bodies = [p1, p2, p3]
-        
-#         println("Testing: ω = $ω, e = $e")
-#         for i=1:ic.nbody
-#             pre_elems = ic.elements[i,:]
-#             elems = get_orbital_elements(s, ic)[i]
-#             post_elems = [elems.m, elems.P, elems.t0, elems.e * cos(elems.ω), elems.e * sin(elems.ω), rem2pi(elems.I, RoundNearest), rem2pi(elems.Ω, RoundNearest)]
-#             @test isapprox(pre_elems, post_elems; rtol=1e-8)
-#         end
-#     end
-# end
-
 @testset "Orbit Initialization" begin
 
     # For n = 4 planets
@@ -75,17 +26,38 @@ end
     1e-4, 1e-4,
     365.242])
 
-    for i in eachindex(optvecs)
-        vec = optvecs[i]
+    push!(optvecs, [1e-3, 1e-3, 1e-4, 1e-4,
+    π/2, -π/2, π/2,
+    π/2, -π/2, -π/2,
+    0., 0.,
+    365.242])
+
+    push!(optvecs, [0.9, 0.9, 0.9, 0.9,
+    2π, -2π, 2π,
+    -2π, 2π, -2π,
+    1e-4, 1e-4,
+    366.242])
+
+    for j in eachindex(optvecs)
+        vec = optvecs[j]
 
         optparams = OptimParameters(4, vec)
         orbparams = OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4], [0.5, 0.5], 2.000, 8*365.242, [1., 1., 5., 3., 2.])
 
         orbit = Orbit(4, optparams, orbparams)
 
+        elems = get_orbital_elements(orbit.s, orbit.ic)
         anoms = get_anomalies(orbit.s, orbit.ic)
 
+        omega = Vector{Float64}(undef, 4)
+        omega[1] = 0.0
         for i=2:orbit.nplanet
+            # Test for eccentricities
+            @test isapprox(elems[i].e, vec[i-1]; rtol=sqrt(eps(Float64)))
+            # Test for longitudes of periastron
+            omega[i] = vec[6+i] + omega[i-1]
+            @test isapprox(rem2pi(elems[i].ω, RoundNearest), rem2pi(omega[i-1], RoundNearest); rtol=sqrt(eps(Float64)))
+            # Test for mean anomalies
             @test isapprox(rem2pi(anoms[i][2], RoundNearest), rem2pi(vec[3+i], RoundNearest); rtol=sqrt(eps(Float64)))
         end
     end
