@@ -4,19 +4,19 @@ using NbodyGradient
 
 using Test
 
-optvec_0 = BigFloat.([0.1, 0.2, 0.3,
-2π, 1e-4,
-0., 1.,
-1e-4,
+optvec_0 = BigFloat.([0.1, 0.1, 0.1, 0.1,
+1π, 1π, 0.,
+0.,0., 0.,
+1e-4, 1e-4,
 365.242])
 
-orbparams = OrbitParameters(BigFloat.([1e-5, 1e-5, 1e-4]), 
-                                BigFloat.([0.5]), 
+orbparams = OrbitParameters(BigFloat.([3e-6, 5e-6, 7e-5, 3e-5]), 
+                                BigFloat.([0.5, 0.5]), 
                                 BigFloat(2.000), 
-                                BigFloat(4*365.242), 
+                                BigFloat(8*365.242), 
                                 BigFloat.([1., 1., 5., 3., 2.]))
 
-nplanet = 3
+nplanet = 4
 epsilon = BigFloat(eps(Float64))
 
 # ForwardDiff
