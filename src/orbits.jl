@@ -51,11 +51,14 @@ end
 
 """Optimization parameters."""
 @kwdef struct OptimParameters{T<:Real}
-    e::Vector{T}
-    M::Vector{T}
-    Δω::Vector{T}
-    Pratio::Vector{T}
-    inner_period::T
+    e::Vector{T}        # nplanet
+    M::Vector{T}        # nplanet
+    Δω::Vector{T}       # nplanet - 1
+    Pratio::Vector{T}   # nplanet - 2
+    inner_period::T     # 1
+    masses::Vector{T}   # nplanet
+    kappa::T            # 1
+    ω1::T               # 1
 end
 
 """
@@ -79,23 +82,27 @@ vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities
 Note that `vec::Vector{T}` must be consistent with the given the number of planets.
 """
 function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
+    # TODO: Have to do this some time later
     if N == 2
         OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
         error("N must be greater than 1!")
     end
 
-    if length(vec) != 4 * N - 3
-        error("The vector is inconsistent with N! Expected $(4 * N - 3), got $(length(vec)) instead")
+    if length(vec) != 5 * N
+        error("The vector is inconsistent with N! Expected $(5 * N), got $(length(vec)) instead")
     end
 
     e = vec[1:N]
-    M = vec[N+1:2N-1]
-    Δω = vec[2N:3N-2]
-    Pratio = vec[3N-1:end-1]
-    inner_period = vec[end]
+    M = vec[N+1:2N]
+    Δω = vec[2N+1:3N-1]
+    Pratio = vec[3N:4N-3]
+    inner_period = vec[4N-2]
+    masses = vec[4N-1:5N-2]
+    kappa = vec[end-1]
+    ω1 = vec[end]
 
-    OptimParameters(e, M, Δω, Pratio, inner_period)
+    OptimParameters(e, M, Δω, Pratio, inner_period, masses, kappa, ω1)
 end
 
 # Converts OptimParameters to a vector
@@ -126,9 +133,8 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 
 """
 @kwdef struct OrbitParameters{T<:Real}
-    mass::Vector{T}
+    nplanet::Int
     cfactor::Vector{T}
-    κ::T
     tsys::T
     weights::Vector{T}
 end
@@ -173,35 +179,45 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     optvec = tovector(optparams)
     periods, mean_anoms, omegas = compute_system_init(optvec, orbparams)
 
-    pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+    pos, vel, pos_star, vel_star = orbital_to_cartesian(optparams.masses, periods, mean_anoms, omegas, optparams.e)
 
     positions = hcat(pos_star, pos) 
     velocities = hcat(vel_star, vel)
 
-    ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
+    ic_mat = vcat(vcat(1., optparams.masses)', vcat(positions, velocities))
 
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
-    # Compute derivatives (Jac 1)
+    kappa = optparams.kappa
+
+    # jac_1 = Matrix{T}(undef, 1, 1)
+    jac_2 = Matrix{T}(undef, 1, 1)
+    jac_3 = Matrix{T}(undef, 1, 1)
+    s_final = deepcopy(s)
+    final_elem = Vector{T}(undef, 1)
+
+    indices = reduce(vcat, vcat([[1, 2, 4, 5, 7] .+ 7*(n-1) for n in 1:orbparams.nplanet+1]))
+
+    # # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
-    # Compute time evolution Jacobian (Jac 2)
+    # # Compute time evolution Jacobian (Jac 2)
     jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
 
-    # Export the elements for testing later
+    # # Export the elements for testing later
     final_elem = extract_elements(deepcopy(s_final), ic, orbparams)
 
-    # Compute derivatives (Jac 3)
+    # # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
-    Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem, s_final)
+    Orbit(s, ic, optparams.kappa, jac_1[indices,:], jac_2[indices,indices], jac_3[:,indices], final_elem, s_final)
 end
 
 """Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
 function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real}
 
-    n = length(orbparams.mass)
+    n = orbparams.nplanet
 
     optparams = OptimParameters(n, optvec)
 
@@ -210,14 +226,14 @@ function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) w
     omegas = Vector{T}(undef, n)
 
     pratio_nom = Vector{T}(undef, n-1)
-    pratio_nom[1] = orbparams.κ
+    pratio_nom[1] = optparams.kappa
     
     for i = 2:n-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
     end 
 
     # Fills in missing M
-    mean_anoms = vcat(0.0, optparams.M)
+    mean_anoms = optparams.M
 
     # Fill in Period ratio deviation for later use
     period_dev = vcat(0.0, optparams.Pratio)
@@ -239,16 +255,16 @@ function compute_derivative_system_init(optvec, orbparams)
 
     # Function for AutoDiff
     function f(x)
-        optparams = OptimParameters(length(orbparams.mass), x)
+        optparams = OptimParameters(orbparams.nplanet, x)
 
         periods, mean_anoms, omegas = compute_system_init(x, orbparams)
         
-        pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+        pos, vel, pos_star, vel_star = orbital_to_cartesian(optparams.masses, periods, mean_anoms, omegas, optparams.e)
 
         positions = hcat(pos_star, pos) 
         velocities = hcat(vel_star, vel)
 
-        mat = vcat(vcat(positions, velocities), vcat(1., orbparams.mass)')
+        mat = vcat(vcat(positions, velocities), vcat(1., optparams.masses)')
 
         return mat
     end
@@ -292,12 +308,14 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     anoms = get_anomalies(x, v, masses)
 
     e = [elems[i].e for i in eachindex(elems)[2:end]]
-    M = [anoms[i][2] for i in eachindex(anoms)[2:end]]
+    M = [anoms[i][2] for i in eachindex(anoms)[1:end]] # Now include the first mean anomaly
     ωdiff = [elems[i].ω - elems[i-1].ω for i in eachindex(elems)[3:end]]
+
+    kappa = elems[3].P / elems[2].P
 
     # Period ratio deviation
     pratio_nom = Vector{T}(undef, nplanet-1)
-    pratio_nom[1] = orbparams.κ
+    pratio_nom[1] = kappa
 
     for i = 2:nplanet-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
@@ -306,7 +324,7 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
     inner_period = elems[2].P
 
-    return vcat(e, M, ωdiff, pratiodev, inner_period)
+    return vcat(e, M, ωdiff, pratiodev, inner_period, masses[2:end], kappa, elems[2].ω)
 end
 
 # Allow calling the function using `State` and `ic` instead of Cartesians
