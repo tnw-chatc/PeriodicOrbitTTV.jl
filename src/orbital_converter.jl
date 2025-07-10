@@ -92,7 +92,7 @@ end
 
 Solve Kepler's equation M = E - e*sin(E) for eccentric anomaly E using Newton-Raphson method.
 """
-function solve_kepler_equation(M::T, ecc::T; max_iter=100) where {T <: Real}
+function solve_kepler_equation(M::T, ecc::T; max_iter=100, tol=1e-16) where {T <: Real}
     E = M + sign(sin(M))*0.85*ecc # Initial guess
     E_old = 2E
     for i in 1:max_iter
@@ -100,9 +100,11 @@ function solve_kepler_equation(M::T, ecc::T; max_iter=100) where {T <: Real}
         fp = 1 - ecc * cos(E)
         
         E_new = E - f / fp
+
+        # println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
+        # println(tol)
         
-        if E_new == E || E_new == E_old
-            # println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
+        if (E_new - ecc * sin(E_new) - M) <= tol
             return E_new
         end
         E_old = E
