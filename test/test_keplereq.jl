@@ -12,7 +12,7 @@ epsilon = eps(Float64)
     0., -π/2, -1π, -3π/2,
     ]
 
-    e_cands = [0.1, 0.3, 0.5, 0.9]
+    e_cands = [0.0, 0.0001, 0.1, 0.5, 0.9, 0.99999]
 
     for M in M_cands, e in e_cands
         println("Testing: $M, $e")
