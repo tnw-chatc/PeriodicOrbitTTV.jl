@@ -100,11 +100,9 @@ function solve_kepler_equation(M::T, ecc::T; max_iter=100, tol=1e-16) where {T <
         fp = 1 - ecc * cos(E)
         
         E_new = E - f / fp
-
-        # println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
-        # println(tol)
         
-        if (E_new - ecc * sin(E_new) - M) <= tol
+        if isapprox(E_new, E; rtol=tol) || isapprox(E_new, E_old; rtol=tol)
+        # println("Check Kepler: ",E_new - ecc * sin(E_new) - M)
             return E_new
         end
         E_old = E
