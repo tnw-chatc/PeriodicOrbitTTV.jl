@@ -37,43 +37,46 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     end 
 
     optvec = tovector(optparams)
-    nplanet = length(orbparams.mass)
-    weights = orbparams.weights
+    nplanet = orbparams.nplanet
 
     # Dummy data
     xdata = zeros(T, length(optvec))
-    # Target is all zero
-    ydata = zeros(T, length(optvec))
+    # Target is all zero with the prior appended
+    ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
+
+    fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+1), [0.])
 
     # TODO: May have to make it easier to configure
     lower_bounds = Float64[]
     upper_bounds = Float64[]
 
-    # Bounds for eccentricities
-    append!(lower_bounds, fill(0.001, nplanet))
-    append!(upper_bounds, fill(0.9, nplanet))
-        
-    # Bounds for mean anomalies
-    append!(lower_bounds, fill(-π, nplanet-1))
-    append!(upper_bounds, fill(π, nplanet-1))
+    lower_bounds = vcat(
+        fill(0.001, nplanet),
+        fill(-π, nplanet),
+        fill(-π, nplanet-1),
+        fill(-0.1, nplanet-2),
+        0.5*365.242,
+        fill(1e-8, nplanet),
+        1.99,
+        -π
+    )
 
-    # Bounds for omegas
-    append!(lower_bounds, fill(-π, nplanet-1))
-    append!(upper_bounds, fill(π, nplanet-1))
-
-    # Bounds for period ratio deviations
-    append!(lower_bounds, fill(-0.1, nplanet-2))
-    append!(upper_bounds, fill(0.1, nplanet-2))
-
-    # Bounds for innermost period
-    push!(lower_bounds, 0.5*365.242)
-    push!(upper_bounds, 2.0*365.242)
+    upper_bounds = vcat(
+        fill(0.9, nplanet),
+        fill(π, nplanet),
+        fill(π, nplanet-1),
+        fill(0.1, nplanet-2),
+        2.0*365.242,
+        fill(1e-2, nplanet),
+        2.01,
+        π
+    )
 
     # Use Autodiffed Jacobian if parsed
     if use_jac
-        fit = curve_fit(objective_function, jacobian, xdata, ydata, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000)
+        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000, show_trace=true)
     else
-        fit = curve_fit(objective_function, xdata, ydata, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000)
+        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000, show_trace=true)
     end
 
     # Parse the LsqFit object 
@@ -97,60 +100,31 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     diff_pratiodev = final_optparams.Pratio - init_optparams.Pratio
     diff_inner_period = final_optparams.inner_period - init_optparams.inner_period
 
-    # Calculated weighted differences if parsed
-    if weighted
-        weights = orbparams.weights
-        
-        diff_e *= weights[1]
-        diff_M *= weights[2]
-        diff_ωdiff *= weights[3]
-        diff_pratiodev *= weights[4]
-        diff_inner_period *= weights[5]
-    end
-
-    # Create a vector
+    # Create a vector, and appended with constant quantities
     diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+    
+    priors = tovector(optparams)
 
-    return diff
+    return [diff; priors]
 end
 
 function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int; weighted::Bool=true) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
-    init_elems = extract_elements(orbit.s, orbit.ic, orbparams)
-    init_optparams = OptimParameters(nplanet, init_elems)
-
-    final_elems = orbit.final_elem
-    final_optparams = OptimParameters(nplanet, final_elems)
-
-    # Calculate the differences for each elements
-    diff_e = final_optparams.e - init_optparams.e
-    diff_M = rem2pi.(final_optparams.M - init_optparams.M, RoundNearest)
-    diff_ωdiff = rem2pi.(final_optparams.Δω - init_optparams.Δω, RoundNearest)
-    diff_pratiodev = final_optparams.Pratio - init_optparams.Pratio
-    diff_inner_period = final_optparams.inner_period - init_optparams.inner_period
-
-    # Calculated weighted differences if parsed
-    if weighted
-        weights = orbparams.weights
-        
-        diff_e *= weights[1]
-        diff_M *= weights[2]
-        diff_ωdiff *= weights[3]
-        diff_pratiodev *= weights[4]
-        diff_inner_period *= weights[5]
+    # Helper function for subtracting the matrix with identity
+    function subtract_iden(mat)
+        N = size(mat, 1)
+        mat[1:N,1:N] = mat[1:N,1:N] - I
+        return mat
     end
 
-    diff_vec = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+    # Jacobian of the difference
+    diff_jac = subtract_iden(orbit.jac_combined[begin:4*nplanet-2,:])
 
-    weights = orbparams.weights
-    weights_vec = reduce(vcat, [fill(weights[1], length(optparams.e)),
-                                fill(weights[2], length(optparams.M)),
-                                fill(weights[3], length(optparams.Δω )),
-                                fill(weights[4], length(optparams.Pratio)),
-                                fill(weights[5], length(optparams.inner_period))])
+    # Jacobians for the priors
+    # iden = diagm(vcat(fill(1., 4*nplanet-2), fill(0, nplanet+1), 1.))
+    # prior_jac = Matrix{T}(I, length(tovector(optparams)), length(tovector(optparams)))
+    # jac = append_identity_diagonal(diff_jac, 5*nplanet)
 
-    jac = weights_vec .* (orbit.jac_combined - I)
-
-    return jac
+    return [diff_jac; Matrix{T}(I, 5*nplanet, 5*nplanet)]
 end

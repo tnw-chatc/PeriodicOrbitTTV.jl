@@ -211,7 +211,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     # # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
-    Orbit(s, ic, optparams.kappa, jac_1[indices,:], jac_2[indices,indices], jac_3[:,indices], final_elem, s_final)
+    Orbit(s, ic, optparams.kappa, jac_1, jac_2, jac_3, final_elem, s_final)
 end
 
 """Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
@@ -239,7 +239,7 @@ function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) w
     period_dev = vcat(0.0, optparams.Pratio)
 
     # Calculates the actual ω's from Δω and periods
-    omegas[1] = 0.
+    omegas[1] = optparams.ω1
     periods[1] = optparams.inner_period
     for i = 2:n
         periods[i] = (pratio_nom[i-1] + period_dev[i-1]) * periods[i-1]
