@@ -14,9 +14,9 @@ using Test
 
     for M in M_cands, e in e_cands
         println("Testing: $M, $e")
-        E = solve_kepler_equation(M, e; tol=1e-14)
+        E = solve_kepler_equation(M, e)
         
         println("$M, $(E - e * sin(E))")
-        @test isapprox(M, E - e * sin(E); rtol=1e-12)
+        @test isapprox(M, E - e * sin(E))
     end
 end
