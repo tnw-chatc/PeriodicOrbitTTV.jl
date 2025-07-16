@@ -5,7 +5,7 @@ using Optim
 using LsqFit
 
 """
-    find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; use_jac=false, verbose=false) where T <: AbstractFloat
+    find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; use_jac=false, verbose=false) where T <: Real
 
 Find a periodic configuration that is periodic. Return the final parameter vector as `OptimParameters`.
 
@@ -15,7 +15,6 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 
 # Optionals
 - `use_jac::Bool` : Calculate and use Jacobians for optimization if true. False by default.
-- `verbose::Bool` : Print optimization log if true. False by default.
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, weighted::Bool=true) where T <: Real
