@@ -51,11 +51,14 @@ end
 
 """Optimization parameters."""
 @kwdef struct OptimParameters{T<:Real}
-    e::Vector{T}
-    M::Vector{T}
-    Δω::Vector{T}
-    Pratio::Vector{T}
-    inner_period::T
+    e::Vector{T}        # nplanet
+    M::Vector{T}        # nplanet
+    Δω::Vector{T}       # nplanet - 1
+    Pratio::Vector{T}   # nplanet - 2
+    inner_period::T     # 1
+    masses::Vector{T}   # nplanet
+    kappa::T            # 1
+    ω1::T               # 1
 end
 
 """
@@ -67,35 +70,44 @@ Convert a plain, non-keyworded optimization paramenter vector into OptimParamete
 - `N:Int` : The number of planets (N >= 2)
 - `vec::Vector{T}` : The optimization vector as a plain, non-keyworded vector
 
-`vec::Vector{T}` has a specific order: `N` eccentricities, `N - 1` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020), and `1` innermost planet period. 
+`vec::Vector{T}` has a specific order: `N` eccentricities, `N` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020), `1` innermost planet period, `N` masses, `1` Kappa, and `1` innermost longitude of periastron. `5N` elements in total.
+
 One example for a four-planet system:
 ```
-vec = [0.1, 0.2, 0.3, 0.4,  # Eccentricities 
-    π, -π/2, 0,             # Mean anomalies
-    0., π/2, π,             # Omega differences
-    1e-4, 1e-4,             # Period ratios
-    365.242]                # Innermost planet period
+optvec_0 = ([0.1, 0.07, 0.05, 0.07, # Eccentricities
+    0., 0., 0., 0.,                 # Mean anomalies
+    0., 0., 0.,                     # Omega differences
+    1e-4, 1e-4,                     # Period ratio deviations
+    365.242,                        # Innermost planet period
+    3e-6, 5e-6, 7e-5, 3e-5,         # Masses
+    2.000,                          # Kappa
+    0.00                            # Innermost longitude of periastron
+])
 ```
-Note that `vec::Vector{T}` must be consistent with the given the number of planets.
+Note that `vec::Vector{T}` must be consistent with the given the number of planets, which is `5N`.
 """
 function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
+    # TODO: Have to do this some time later
     if N == 2
         OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
     elseif N == 1
         error("N must be greater than 1!")
     end
 
-    if length(vec) != 4 * N - 3
-        error("The vector is inconsistent with N! Expected $(4 * N - 3), got $(length(vec)) instead")
+    if length(vec) != 5 * N
+        error("The vector is inconsistent with N! Expected $(5 * N), got $(length(vec)) instead")
     end
 
     e = vec[1:N]
-    M = vec[N+1:2N-1]
-    Δω = vec[2N:3N-2]
-    Pratio = vec[3N-1:end-1]
-    inner_period = vec[end]
+    M = vec[N+1:2N]
+    Δω = vec[2N+1:3N-1]
+    Pratio = vec[3N:4N-3]
+    inner_period = vec[4N-2]
+    masses = vec[4N-1:5N-2]
+    kappa = vec[end-1]
+    ω1 = vec[end]
 
-    OptimParameters(e, M, Δω, Pratio, inner_period)
+    OptimParameters(e, M, Δω, Pratio, inner_period, masses, kappa, ω1)
 end
 
 # Converts OptimParameters to a vector
@@ -107,17 +119,15 @@ tovector(x::OptimParameters) = reduce(vcat, [getfield(x, field) for field in fie
 Orbital parameters that will not be affected by the optimization
 
 # Fields
-- `mass::Vector{T}` : Mass of each planet
+- `nplanet::Int` : The number of the planets
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
-- `κ::T` : Constant κ defined in G&M (2020)
 - `tsys::T` : Periodic orbit system period (i.e., integration time)
 - `weights::Vector{T}` : The weights for calculating differences during optimization. The order follows the parameters of `OptimParameters`.
 
 One example for a four-planet system:
 ```
-OrbitParameters([1e-4, 1e-4, 1e-4, 1e-4],   # Masses of the planets
+OrbitParameters(4,                          # The number of the planets
                 [0.5, 0.5],                 # C_i factors
-                2.000,                      # κ
                 8*365.242,                  # Periodic orbit system period
                 [1., 1., 5., 3., 2.])       # Optimization weightss         
 ```
@@ -126,9 +136,8 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 
 """
 @kwdef struct OrbitParameters{T<:Real}
-    mass::Vector{T}
+    nplanet::Int
     cfactor::Vector{T}
-    κ::T
     tsys::T
     weights::Vector{T}
 end
@@ -141,24 +150,7 @@ Main constructor for Orbit object. Access states and initial conditions of the s
 # Arguments
 - `n::Int` : The number of planets
 - `optparams::OptimParameters{T}` : Optimization parameters
-- `orbparams::OrbitParameters{T}` : Orbit parameters
-
-# Examples
-
-The following example is to initialize a four-planet system
-```
-# The order is the same: eccentricities, mean anomalies, ω differences, and period ratios
-vec = [0.05, 0.07, 0.05, 0.07,
-    0., 0., 0.,
-    0., 0., 0.,
-    1e-4, 1e-4,
-    365.242,
-]
-
-# Number of planets, optimization vectors
-optparams = OptimParameters(4, vec)
-# Three arguements: planet masses vector, C values (in this case a vector consist of 0.5s, and kappa)
-orbparams = OrbitParameters([3e-6, 5e-6, 7e-5, 3e-5], [0.5, 0.5], 2.000, 8*365.2422, [1., 1., 5., 3., 2.])
+- `orbparams::OrbitParameters{T}` : Orbit parameters)
 
 # Orbit object takes three arguments: number of planets, opt params, and orbit params
 orbit = Orbit(4, optparams, orbparams)
@@ -173,35 +165,45 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     optvec = tovector(optparams)
     periods, mean_anoms, omegas = compute_system_init(optvec, orbparams)
 
-    pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+    pos, vel, pos_star, vel_star = orbital_to_cartesian(optparams.masses, periods, mean_anoms, omegas, optparams.e)
 
     positions = hcat(pos_star, pos) 
     velocities = hcat(vel_star, vel)
 
-    ic_mat = vcat(vcat(1., orbparams.mass)', vcat(positions, velocities))
+    ic_mat = vcat(vcat(1., optparams.masses)', vcat(positions, velocities))
 
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
-    # Compute derivatives (Jac 1)
+    kappa = optparams.kappa
+
+    # jac_1 = Matrix{T}(undef, 1, 1)
+    jac_2 = Matrix{T}(undef, 1, 1)
+    jac_3 = Matrix{T}(undef, 1, 1)
+    s_final = deepcopy(s)
+    final_elem = Vector{T}(undef, 1)
+
+    indices = reduce(vcat, vcat([[1, 2, 4, 5, 7] .+ 7*(n-1) for n in 1:orbparams.nplanet+1]))
+
+    # # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
-    # Compute time evolution Jacobian (Jac 2)
+    # # Compute time evolution Jacobian (Jac 2)
     jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
 
-    # Export the elements for testing later
+    # # Export the elements for testing later
     final_elem = extract_elements(deepcopy(s_final), ic, orbparams)
 
-    # Compute derivatives (Jac 3)
+    # # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
-    Orbit(s, ic, orbparams.κ, jac_1, jac_2, jac_3, final_elem, s_final)
+    Orbit(s, ic, optparams.kappa, jac_1, jac_2, jac_3, final_elem, s_final)
 end
 
 """Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
 function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real}
 
-    n = length(orbparams.mass)
+    n = orbparams.nplanet
 
     optparams = OptimParameters(n, optvec)
 
@@ -210,20 +212,20 @@ function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) w
     omegas = Vector{T}(undef, n)
 
     pratio_nom = Vector{T}(undef, n-1)
-    pratio_nom[1] = orbparams.κ
+    pratio_nom[1] = optparams.kappa
     
     for i = 2:n-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
     end 
 
     # Fills in missing M
-    mean_anoms = vcat(0.0, optparams.M)
+    mean_anoms = optparams.M
 
     # Fill in Period ratio deviation for later use
     period_dev = vcat(0.0, optparams.Pratio)
 
     # Calculates the actual ω's from Δω and periods
-    omegas[1] = 0.
+    omegas[1] = optparams.ω1
     periods[1] = optparams.inner_period
     for i = 2:n
         periods[i] = (pratio_nom[i-1] + period_dev[i-1]) * periods[i-1]
@@ -239,16 +241,16 @@ function compute_derivative_system_init(optvec, orbparams)
 
     # Function for AutoDiff
     function f(x)
-        optparams = OptimParameters(length(orbparams.mass), x)
+        optparams = OptimParameters(orbparams.nplanet, x)
 
         periods, mean_anoms, omegas = compute_system_init(x, orbparams)
         
-        pos, vel, pos_star, vel_star = orbital_to_cartesian(orbparams.mass, periods, mean_anoms, omegas, optparams.e)
+        pos, vel, pos_star, vel_star = orbital_to_cartesian(optparams.masses, periods, mean_anoms, omegas, optparams.e)
 
         positions = hcat(pos_star, pos) 
         velocities = hcat(vel_star, vel)
 
-        mat = vcat(vcat(positions, velocities), vcat(1., orbparams.mass)')
+        mat = vcat(vcat(positions, velocities), vcat(1., optparams.masses)')
 
         return mat
     end
@@ -292,12 +294,14 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     anoms = get_anomalies(x, v, masses)
 
     e = [elems[i].e for i in eachindex(elems)[2:end]]
-    M = [anoms[i][2] for i in eachindex(anoms)[2:end]]
+    M = [anoms[i][2] for i in eachindex(anoms)[1:end]] # Now include the first mean anomaly
     ωdiff = [elems[i].ω - elems[i-1].ω for i in eachindex(elems)[3:end]]
+
+    kappa = elems[3].P / elems[2].P
 
     # Period ratio deviation
     pratio_nom = Vector{T}(undef, nplanet-1)
-    pratio_nom[1] = orbparams.κ
+    pratio_nom[1] = kappa
 
     for i = 2:nplanet-1
         pratio_nom[i] = 1/(1 + orbparams.cfactor[i-1]*(1 - pratio_nom[i-1]))
@@ -306,7 +310,7 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
     inner_period = elems[2].P
 
-    return vcat(e, M, ωdiff, pratiodev, inner_period)
+    return vcat(e, M, ωdiff, pratiodev, inner_period, masses[2:end], kappa, elems[2].ω)
 end
 
 # Allow calling the function using `State` and `ic` instead of Cartesians
