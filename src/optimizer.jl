@@ -51,24 +51,24 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
     lower_bounds = vcat(
         fill(eccmin, nplanet),
-        fill(-π, nplanet),
-        fill(-π, nplanet-1),
+        fill(-2π, nplanet),
+        fill(-2π, nplanet-1),
         fill(-0.1, nplanet-2),
         0.5*365.242,
         fill(1e-8, nplanet),
         1.9,
-        -π
+        -2π
     )
 
     upper_bounds = vcat(
         fill(0.9, nplanet),
-        fill(π, nplanet),
-        fill(π, nplanet-1),
+        fill(2π, nplanet),
+        fill(2π, nplanet-1),
         fill(0.1, nplanet-2),
         2.0*365.242,
         fill(1e-2, nplanet),
         2.1,
-        π
+        2π
     )
 
     # Use Autodiffed Jacobian if parsed
