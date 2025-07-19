@@ -17,7 +17,7 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `use_jac::Bool` : Calculate and use Jacobians for optimization if true. False by default.
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
-    use_jac::Bool=true, weighted::Bool=true, trace::Bool=false) where T <: Real
+    use_jac::Bool=true, weighted::Bool=true, trace::Bool=false,eccmin::T=1e-3) where T <: Real
 
     function objective_function(_, p)
         optparams = OptimParameters(nplanet, p)
@@ -50,7 +50,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     upper_bounds = Float64[]
 
     lower_bounds = vcat(
-        fill(1e-3, nplanet),
+        fill(eccmin, nplanet),
         fill(-π, nplanet),
         fill(-π, nplanet-1),
         fill(-0.1, nplanet-2),
