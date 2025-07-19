@@ -17,7 +17,7 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `use_jac::Bool` : Calculate and use Jacobians for optimization if true. False by default.
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
-    use_jac::Bool=true, weighted::Bool=true, trace::Bool=false,eccmin::T=1e-3) where T <: Real
+    use_jac::Bool=true, weighted::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000) where T <: Real
 
     function objective_function(_, p)
         optparams = OptimParameters(nplanet, p)
@@ -73,9 +73,9 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
     # Use Autodiffed Jacobian if parsed
     if use_jac
-        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000, show_trace=trace)
+        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
     else
-        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=1000, show_trace=trace)
+        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
     end
 
     # Parse the LsqFit object 
