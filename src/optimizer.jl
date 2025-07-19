@@ -43,7 +43,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     # Target is all zero with the prior appended
     ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
 
-    fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+1), [0.])
+    fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+2))
 
     # TODO: May have to make it easier to configure
     lower_bounds = Float64[]
