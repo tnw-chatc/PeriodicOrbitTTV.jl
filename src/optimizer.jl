@@ -50,13 +50,13 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     upper_bounds = Float64[]
 
     lower_bounds = vcat(
-        fill(0.001, nplanet),
+        fill(1e-8, nplanet),
         fill(-π, nplanet),
         fill(-π, nplanet-1),
         fill(-0.1, nplanet-2),
         0.5*365.242,
         fill(1e-8, nplanet),
-        1.99,
+        1.9,
         -π
     )
 
@@ -67,7 +67,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         fill(0.1, nplanet-2),
         2.0*365.242,
         fill(1e-2, nplanet),
-        2.01,
+        2.1,
         π
     )
 
