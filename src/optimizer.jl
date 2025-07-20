@@ -64,7 +64,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         fill(0.9, nplanet),
         fill(2π, nplanet),
         fill(2π, nplanet-1),
-        fill(0.5, nplanet-2),
+        fill(100.0, nplanet-2),
         2.0*365.242,
         fill(1e-2, nplanet),
         2.1,
