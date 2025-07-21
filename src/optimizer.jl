@@ -22,7 +22,7 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, 
-    prior_weights=nothing) where T <: Real
+    prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
 
     function objective_function(_, p)
         optparams = OptimParameters(nplanet, p)
@@ -59,30 +59,41 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         fit_weight = vcat(fill(1e1, 4*nplanet-2), prior_weights)
     end
 
-    lower_bounds = Float64[]
-    upper_bounds = Float64[]
+    # Check and initialize default lower bounds
+    if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet
+        error("Inconsistent lower bounds. Expected $(5 * nplanet), got $(length(lower_bounds)) instead.")
+    end
 
-    lower_bounds = vcat(
-        fill(eccmin, nplanet),
-        fill(-2π, nplanet),
-        fill(-2π, nplanet-1),
-        fill(-0.5, nplanet-2),
-        0.5*365.242,
-        fill(1e-8, nplanet),
-        1.9,
-        -2π
-    )
+    if lower_bounds === nothing
+        lower_bounds = vcat(
+            fill(eccmin, nplanet),
+            fill(-2π, nplanet),
+            fill(-2π, nplanet-1),
+            fill(-0.5, nplanet-2),
+            0.5*365.242,
+            fill(1e-8, nplanet),
+            1.9,
+            -2π
+        )
+    end
 
-    upper_bounds = vcat(
-        fill(0.9, nplanet),
-        fill(2π, nplanet),
-        fill(2π, nplanet-1),
-        fill(0.5, nplanet-2),
-        2.0*365.242,
-        fill(1e-2, nplanet),
-        2.1,
-        2π
-    )
+    # Check and initialize default upper bounds
+    if upper_bounds !== nothing && length(upper_bounds) != 5 * nplanet
+        error("Inconsistent upper bounds. Expected $(5 * nplanet), got $(length(upper_bounds)) instead.")
+    end
+
+    if upper_bounds === nothing
+        upper_bounds = vcat(
+            fill(0.9, nplanet),
+            fill(2π, nplanet),
+            fill(2π, nplanet-1),
+            fill(0.5, nplanet-2),
+            2.0*365.242,
+            fill(1e-2, nplanet),
+            2.1,
+            2π
+        )
+    end
 
     # Use Autodiffed Jacobian if parsed
     if use_jac
