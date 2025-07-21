@@ -122,14 +122,12 @@ Orbital parameters that will not be affected by the optimization
 - `nplanet::Int` : The number of the planets
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
 - `tsys::T` : Periodic orbit system period (i.e., integration time)
-- `weights::Vector{T}` : The weights for calculating differences during optimization. The order follows the parameters of `OptimParameters`.
 
 One example for a four-planet system:
 ```
 OrbitParameters(4,                          # The number of the planets
                 [0.5, 0.5],                 # C_i factors
-                8*365.242,                  # Periodic orbit system period
-                [1., 1., 5., 3., 2.])       # Optimization weightss         
+                8*365.242)                  # Periodic orbit system period       
 ```
 
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
@@ -139,7 +137,6 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
     nplanet::Int
     cfactor::Vector{T}
     tsys::T
-    weights::Vector{T}
 end
 
 """
@@ -174,16 +171,6 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
 
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
-
-    kappa = optparams.kappa
-
-    # jac_1 = Matrix{T}(undef, 1, 1)
-    jac_2 = Matrix{T}(undef, 1, 1)
-    jac_3 = Matrix{T}(undef, 1, 1)
-    s_final = deepcopy(s)
-    final_elem = Vector{T}(undef, 1)
-
-    indices = reduce(vcat, vcat([[1, 2, 4, 5, 7] .+ 7*(n-1) for n in 1:orbparams.nplanet+1]))
 
     # # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)

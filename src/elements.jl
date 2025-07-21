@@ -24,7 +24,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     a = 1. / (2/R - v2/Gm)
 
     # (2.135)
-    e = sqrt(1 - h^2 / (Gm * a))
+    e = sqrt(clamp(1 - h^2 / (Gm * a),0.0,1.0))
 
     # (2.136)
     I = acos(clamp(hvec[3] / h, -1, 1))
