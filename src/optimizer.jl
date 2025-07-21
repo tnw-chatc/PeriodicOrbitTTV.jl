@@ -14,7 +14,11 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `orbparams::OrbitParameters{T}` : The orbit parameters. These parameters are static during the entire optimizations. See its constructor's docstring.
 
 # Optionals
-- `use_jac::Bool` : Calculate and use Jacobians for optimization if true. False by default.
+- `use_jac::Bool` : Calculate and use Jacobians for optimization. True by Default.
+- `trace::Bool` : Show optimizer trace. False by default.
+- `eccmin::T` : The lower bounds for eccentricities
+- `maxit::Int64` : Maximum optimizer iterations
+- `prior_weight::Float64` : The weight of priors
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, weighted::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000,prior_weight::Float64=1e8) where T <: Real
