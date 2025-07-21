@@ -172,16 +172,6 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
-    kappa = optparams.kappa
-
-    # jac_1 = Matrix{T}(undef, 1, 1)
-    jac_2 = Matrix{T}(undef, 1, 1)
-    jac_3 = Matrix{T}(undef, 1, 1)
-    s_final = deepcopy(s)
-    final_elem = Vector{T}(undef, 1)
-
-    indices = reduce(vcat, vcat([[1, 2, 4, 5, 7] .+ 7*(n-1) for n in 1:orbparams.nplanet+1]))
-
     # # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
