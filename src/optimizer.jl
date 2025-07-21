@@ -49,7 +49,6 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
     fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(prior_weight, nplanet+2))
 
-    # TODO: May have to make it easier to configure
     lower_bounds = Float64[]
     upper_bounds = Float64[]
 
@@ -83,7 +82,6 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     end
 
     # Parse the LsqFit object 
-    # TODO: May wanna change this later
     return fit
 end
 
@@ -123,11 +121,6 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
 
     # Jacobian of the difference
     diff_jac = subtract_iden(orbit.jac_combined[begin:4*nplanet-2,:])
-
-    # Jacobians for the priors
-    # iden = diagm(vcat(fill(1., 4*nplanet-2), fill(0, nplanet+1), 1.))
-    # prior_jac = Matrix{T}(I, length(tovector(optparams)), length(tovector(optparams)))
-    # jac = append_identity_diagonal(diff_jac, 5*nplanet)
 
     return [diff_jac; Matrix{T}(I, 5*nplanet, 5*nplanet)]
 end
