@@ -21,12 +21,12 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `prior_weight::Float64` : The weight of priors
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
-    use_jac::Bool=true, weighted::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000,prior_weight::Float64=1e8) where T <: Real
+    use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000,prior_weight::Float64=1e8) where T <: Real
 
     function objective_function(_, p)
         optparams = OptimParameters(nplanet, p)
 
-        diff_squared = compute_diff_squared(optparams, orbparams, nplanet; weighted=weighted)
+        diff_squared = compute_diff_squared(optparams, orbparams, nplanet)
 
         return diff_squared
     end
@@ -34,7 +34,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     function jacobian(_, p)
         optparams = OptimParameters(nplanet, p)
 
-        jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet; weighted=weighted)
+        jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet)
 
         return jac
     end 
@@ -87,7 +87,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     return fit
 end
 
-function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int; weighted::Bool=true) where T <: Real
+function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
     init_elems = extract_elements(orbit.s, orbit.ic, orbparams)
@@ -111,7 +111,7 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     return [diff; priors]
 end
 
-function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int; weighted::Bool=true) where T <: Real
+function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
     # Helper function for subtracting the matrix with identity
