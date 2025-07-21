@@ -18,10 +18,11 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `trace::Bool` : Show optimizer trace. False by default.
 - `eccmin::T` : The lower bounds for eccentricities
 - `maxit::Int64` : Maximum optimizer iterations
-- `prior_weight::Float64` : The weight of priors
+- `prior_weight::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet`
 """
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
-    use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000,prior_weight::Float64=1e8) where T <: Real
+    use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, 
+    prior_weights=nothing) where T <: Real
 
     function objective_function(_, p)
         optparams = OptimParameters(nplanet, p)
@@ -47,7 +48,16 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     # Target is all zero with the prior appended
     ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
 
-    fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(prior_weight, nplanet+2))
+    # Check and initialize default prior weights
+    if prior_weights !== nothing && length(prior_weights) != 5 * nplanet
+        error("Inconsistent prior weights. Expected $(5 * nplanet), got $(length(prior_weights)) instead.")
+    end
+
+    if prior_weights === nothing
+        fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+2))
+    else
+        fit_weight = vcat(fill(1e1, 4*nplanet-2), prior_weights)
+    end
 
     lower_bounds = Float64[]
     upper_bounds = Float64[]
