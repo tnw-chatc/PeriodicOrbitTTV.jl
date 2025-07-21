@@ -122,14 +122,12 @@ Orbital parameters that will not be affected by the optimization
 - `nplanet::Int` : The number of the planets
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
 - `tsys::T` : Periodic orbit system period (i.e., integration time)
-- `weights::Vector{T}` : The weights for calculating differences during optimization. The order follows the parameters of `OptimParameters`.
 
 One example for a four-planet system:
 ```
 OrbitParameters(4,                          # The number of the planets
                 [0.5, 0.5],                 # C_i factors
-                8*365.242,                  # Periodic orbit system period
-                [1., 1., 5., 3., 2.])       # Optimization weightss         
+                8*365.242)                  # Periodic orbit system period       
 ```
 
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
@@ -139,7 +137,6 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
     nplanet::Int
     cfactor::Vector{T}
     tsys::T
-    weights::Vector{T}
 end
 
 """
