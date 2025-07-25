@@ -44,6 +44,7 @@ mutable struct Orbit{T<:Real}
         nplanet = ic.nbody - 1
 
         jac_combined = jac_3 * jac_2 * jac_1
+        # jac_combined = Matrix{T}(undef, 0, 0)
     
         new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem, state_final)
     end
@@ -59,6 +60,7 @@ end
     masses::Vector{T}   # nplanet
     kappa::T            # 1
     ω1::T               # 1
+    tsys::T             # 1
 end
 
 """
@@ -94,8 +96,8 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
         error("N must be greater than 1!")
     end
 
-    if length(vec) != 5 * N
-        error("The vector is inconsistent with N! Expected $(5 * N), got $(length(vec)) instead")
+    if length(vec) != 5 * N + 1
+        error("The vector is inconsistent with N! Expected $(5 * N + 1), got $(length(vec)) instead")
     end
 
     e = vec[1:N]
@@ -104,10 +106,11 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     Pratio = vec[3N:4N-3]
     inner_period = vec[4N-2]
     masses = vec[4N-1:5N-2]
-    kappa = vec[end-1]
-    ω1 = vec[end]
+    kappa = vec[end-2]
+    ω1 = vec[end-1]
+    tsys = vec[end]
 
-    OptimParameters(e, M, Δω, Pratio, inner_period, masses, kappa, ω1)
+    OptimParameters(e, M, Δω, Pratio, inner_period, masses, kappa, ω1, tsys)
 end
 
 # Converts OptimParameters to a vector
@@ -136,7 +139,6 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 @kwdef struct OrbitParameters{T<:Real}
     nplanet::Int
     cfactor::Vector{T}
-    tsys::T
 end
 
 """
@@ -176,7 +178,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
     # # Compute time evolution Jacobian (Jac 2)
-    jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), orbparams.tsys, optparams.inner_period)
+    jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), optparams.tsys, optparams.inner_period)
 
     # # Export the elements for testing later
     final_elem = extract_elements(deepcopy(s_final), ic, orbparams)
@@ -244,6 +246,13 @@ function compute_derivative_system_init(optvec, orbparams)
 
     J = ForwardDiff.jacobian(f, optvec)
 
+    # Append time dependence gradient to jacobian
+    J = vcat(J, fill(0., size(J, 2))')
+
+    # Ensure that derivative w.r.t to itself is 1
+    # TODO: Use dynamic type conversion here
+    J[end, end] = 1.
+
     return J
 end
 
@@ -268,7 +277,7 @@ function calculate_jac_time_evolution(state::State{T}, tsys::T, inn_period::T) w
     # Integrator(ahl21!, convert(T, 1.), convert(T, 0.), tsys)(state)
 
     # Return the time evolution jacobian (Jacobian 2)
-    return copy(state.jac_step), state
+    return hcat(copy(state.jac_step), state.dqdt), state
 end
 
 
@@ -297,6 +306,7 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
     inner_period = elems[2].P
 
+    # Pass a dummy time value of zero (since we don't need that. We only need its time dependence)
     return vcat(e, M, ωdiff, pratiodev, inner_period, masses[2:end], kappa, elems[2].ω)
 end
 
