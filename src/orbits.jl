@@ -72,7 +72,7 @@ Convert a plain, non-keyworded optimization paramenter vector into OptimParamete
 - `N:Int` : The number of planets (N >= 2)
 - `vec::Vector{T}` : The optimization vector as a plain, non-keyworded vector
 
-`vec::Vector{T}` has a specific order: `N` eccentricities, `N` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020), `1` innermost planet period, `N` masses, `1` Kappa, and `1` innermost longitude of periastron. `5N` elements in total.
+`vec::Vector{T}` has a specific order: `N` eccentricities, `N` mean anomalies, `N - 1` omega differences, and `N - 2` period ratios as defined in Gozdziewski and Migaszewski (2020), `1` innermost planet period, `N` masses, `1` Kappa, `1` innermost longitude of periastron, and `1` PO system period. `5N+1` elements in total.
 
 One example for a four-planet system:
 ```
@@ -84,9 +84,10 @@ optvec_0 = ([0.1, 0.07, 0.05, 0.07, # Eccentricities
     3e-6, 5e-6, 7e-5, 3e-5,         # Masses
     2.000,                          # Kappa
     0.00                            # Innermost longitude of periastron
+    8*365.242                       # Periodic orbit system period
 ])
 ```
-Note that `vec::Vector{T}` must be consistent with the given the number of planets, which is `5N`.
+Note that `vec::Vector{T}` must be consistent with the given the number of planets, which is `5N+1`.
 """
 function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     # TODO: Have to do this some time later
@@ -124,13 +125,11 @@ Orbital parameters that will not be affected by the optimization
 # Fields
 - `nplanet::Int` : The number of the planets
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
-- `tsys::T` : Periodic orbit system period (i.e., integration time)
 
 One example for a four-planet system:
 ```
 OrbitParameters(4,                          # The number of the planets
-                [0.5, 0.5],                 # C_i factors
-                8*365.242)                  # Periodic orbit system period       
+                [0.5, 0.5])                # C_i factors 
 ```
 
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
