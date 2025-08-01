@@ -49,19 +49,19 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
 
     # Check and initialize default prior weights
-    if prior_weights !== nothing && length(prior_weights) != 5 * nplanet
-        error("Inconsistent prior weights. Expected $(5 * nplanet), got $(length(prior_weights)) instead.")
+    if prior_weights !== nothing && length(prior_weights) != 5 * nplanet + 1
+        error("Inconsistent prior weights. Expected $(5 * nplanet + 1), got $(length(prior_weights)) instead.")
     end
 
     if prior_weights === nothing
-        fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+2))
+        fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+3))
     else
         fit_weight = vcat(fill(1e1, 4*nplanet-2), prior_weights)
     end
 
     # Check and initialize default lower bounds
-    if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet
-        error("Inconsistent lower bounds. Expected $(5 * nplanet), got $(length(lower_bounds)) instead.")
+    if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet + 1
+        error("Inconsistent lower bounds. Expected $(5 * nplanet + 1), got $(length(lower_bounds)) instead.")
     end
 
     if lower_bounds === nothing
@@ -73,13 +73,14 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             0.5*365.242,
             fill(1e-8, nplanet),
             1.9,
-            -2π
+            -2π,
+            7*365.242,
         )
     end
 
     # Check and initialize default upper bounds
-    if upper_bounds !== nothing && length(upper_bounds) != 5 * nplanet
-        error("Inconsistent upper bounds. Expected $(5 * nplanet), got $(length(upper_bounds)) instead.")
+    if upper_bounds !== nothing && length(upper_bounds) != 5 * nplanet + 1
+        error("Inconsistent upper bounds. Expected $(5 * nplanet + 1), got $(length(upper_bounds)) instead.")
     end
 
     if upper_bounds === nothing
@@ -91,7 +92,8 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             2.0*365.242,
             fill(1e-2, nplanet),
             2.1,
-            2π
+            2π,
+            9*365.242,
         )
     end
 
@@ -109,11 +111,10 @@ end
 function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
-    init_elems = extract_elements(orbit.s, orbit.ic, orbparams)
-    init_optparams = OptimParameters(nplanet, init_elems)
+    init_optparams = optparams
 
     final_elems = orbit.final_elem
-    final_optparams = OptimParameters(nplanet, final_elems)
+    final_optparams = OptimParameters(nplanet, vcat(final_elems, 0.))
 
     # Calculate the differences for each elements
     diff_e = final_optparams.e - init_optparams.e
@@ -143,5 +144,5 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
     # Jacobian of the difference
     diff_jac = subtract_iden(orbit.jac_combined[begin:4*nplanet-2,:])
 
-    return [diff_jac; Matrix{T}(I, 5*nplanet, 5*nplanet)]
+    return [diff_jac; Matrix{T}(I, 5*nplanet+1, 5*nplanet+1)]
 end
