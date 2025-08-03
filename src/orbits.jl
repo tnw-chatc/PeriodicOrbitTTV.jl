@@ -92,7 +92,7 @@ Note that `vec::Vector{T}` must be consistent with the given the number of plane
 function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     # TODO: Have to do this some time later
     if N == 2
-        OptimParameters(vec[1:2], vec[3:3], vec[4:4], T[], vec[5])
+        OptimParameters(vec[1:2], vec[3:4], vec[5:5], T[], vec[6], vec[7:8], vec[9], vec[10], vec[11])
     elseif N == 1
         error("N must be greater than 1!")
     end
@@ -305,8 +305,11 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     pratiodev = [(elems[i].P / elems[i-1].P) - pratio_nom[i-2] for i in eachindex(elems)[4:end]]
     inner_period = elems[2].P
 
-    # Pass a dummy time value of zero (since we don't need that. We only need its time dependence)
-    return vcat(e, M, ωdiff, pratiodev, inner_period, masses[2:end], kappa, elems[2].ω)
+    if nplanet == 2
+        return vcat(e, M, ωdiff, inner_period, masses[2:end], kappa, elems[2].ω)
+    else
+        return vcat(e, M, ωdiff, pratiodev, inner_period, masses[2:end], kappa, elems[2].ω)
+    end
 end
 
 # Allow calling the function using `State` and `ic` instead of Cartesians
