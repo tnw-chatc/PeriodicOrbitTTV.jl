@@ -12,13 +12,13 @@ optvec_0 = BigFloat.([0.1, 0.07, 0.05,
 365.242,
 3e-6, 5e-6, 7e-5,
 2.000,
-0.00
+0.00,
+4*365.242
 ])
 
 orbparams = OrbitParameters(3,
                                 BigFloat.([0.5, 0.5]), 
-                                BigFloat(8*365.242), 
-                                BigFloat.([1., 1., 5., 3., 2.]))
+                                BigFloat(4*365.242))
 
 nplanet = 3
 epsilon = BigFloat(eps(Float64))
@@ -50,6 +50,13 @@ orbit_0 = Orbit(nplanet, OptimParameters(nplanet, deepcopy(optvec_0)), orbparams
         fd = FiniteDifferences.central_fdm(2, 1)
         optvec_derivatives = jacobian(fd, func_1, optvec_0)[1]
 
+        # Append time dependence gradient to jacobian
+        optvec_derivatives = vcat(optvec_derivatives, fill(0., size(optvec_derivatives, 2))')
+
+        # Ensure that derivative w.r.t to itself is 1
+        # TODO: Use dynamic type conversion here
+        optvec_derivatives[end, end] = 1.
+
         for i in 1:1:size(optvec_derivatives, 1), j in 1:1:size(optvec_derivatives, 2)
             @test isapprox(orbit_0.jac_1[i,j], optvec_derivatives[i,j]; atol=epsilon)
         end
@@ -67,6 +74,7 @@ orbit_0 = Orbit(nplanet, OptimParameters(nplanet, deepcopy(optvec_0)), orbparams
         end
 
         function state_to_matrix(state::State)
+            # return vcat(reshape(vcat(state.x, state.v, state.m'), :), state.t[1])
             return vcat(state.x, state.v, state.m')
         end
 
@@ -85,6 +93,10 @@ orbit_0 = Orbit(nplanet, OptimParameters(nplanet, deepcopy(optvec_0)), orbparams
         fd = FiniteDifferences.central_fdm(2, 1)
         optvec_derivatives = jacobian(fd, func_2, input_mat_0)[1]
 
+        final_state_0 = calculate_jac_time_evolution(matrix_to_state(deepcopy(orbit_2.s), input_mat_0), orbparams.tsys, optvec_0[4*nplanet-2])[2]
+
+        optvec_derivatives = hcat(copy(optvec_derivatives), final_state_0.dqdt)
+
         for i in 1:1:size(optvec_derivatives, 1), j in 1:1:size(optvec_derivatives, 2)
             @test isapprox(orbit_0.jac_2[i,j], optvec_derivatives[i,j]; rtol=epsilon)
         end
@@ -98,9 +110,8 @@ orbit_0 = Orbit(nplanet, OptimParameters(nplanet, deepcopy(optvec_0)), orbparams
         final_state_0 = orbit_3.state_final
         jac3_ic = orbit_3.ic
 
-        input_mat_0 = vcat(final_state_0.x, final_state_0.v, jac3_ic.m')
+        input_mat_0 = vcat(final_state_0.x, final_state_0.v, final_state_0.m')
 
-        # Function for Jacobian 3
         function final_state_to_elements(input)
             xx = input[1:3,:]
             vv = input[4:6,:]
