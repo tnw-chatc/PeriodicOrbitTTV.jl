@@ -48,6 +48,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     # Target is all zero with the prior appended
     ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
 
+
     # Check and initialize default prior weights
     if prior_weights !== nothing && length(prior_weights) != 5 * nplanet + 1
         error("Inconsistent prior weights. Expected $(5 * nplanet + 1), got $(length(prior_weights)) instead.")
@@ -88,7 +89,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             fill(0.9, nplanet),
             fill(2π, nplanet),
             fill(2π, nplanet-1),
-            fill(0.5, nplanet-2),
+            fill(100.0, nplanet-2),
             2.0*365.242,
             fill(1e-2, nplanet),
             2.1,
@@ -96,7 +97,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             9*365.242,
         )
     end
-
+  
     # Use Autodiffed Jacobian if parsed
     if use_jac
         fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
