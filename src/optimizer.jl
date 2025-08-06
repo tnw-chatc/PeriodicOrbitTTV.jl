@@ -126,7 +126,7 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     init_optparams = optparams
 
     final_elems = orbit.final_elem
-    final_optparams = OptimParameters(nplanet, vcat(final_elems, 0.))
+    final_optparams = OptimParameters(nplanet, vcat(final_elems, zero(T)))
 
     # Calculate the differences for each elements
     diff_e = final_optparams.e - init_optparams.e
