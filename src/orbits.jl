@@ -246,11 +246,10 @@ function compute_derivative_system_init(optvec, orbparams)
     J = ForwardDiff.jacobian(f, optvec)
 
     # Append time dependence gradient to jacobian
-    J = vcat(J, fill(0., size(J, 2))')
+    J = vcat(J, fill(zero(eltype(J)), size(J, 2))')
 
     # Ensure that derivative w.r.t to itself is 1
-    # TODO: Use dynamic type conversion here
-    J[end, end] = 1.
+    J[end, end] = one(eltype(J))
 
     return J
 end

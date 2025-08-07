@@ -18,10 +18,13 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `trace::Bool` : Show optimizer trace. False by default.
 - `eccmin::T` : The lower bounds for eccentricities
 - `maxit::Int64` : Maximum optimizer iterations
-- `prior_weight::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet`
-"""
+- `optim_weights::Float64` : The weights of the optimization parameters. The length must equal `4*nplanet-2`
+- `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet+1`
+- `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
+""" 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
-    use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, 
+    use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
     prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
 
     function objective_function(_, p)
@@ -48,6 +51,14 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     # Target is all zero with the prior appended
     ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec))
 
+    # Check and initialize default optimization weights 
+    if optim_weights !== nothing && length(optim_weights) != 4 * nplanet - 2
+        error("Inconsistent optimization weights. Expected $(4 * nplanet - 2), got $(length(optim_weights)) instead.")
+    end
+
+    if optim_weights === nothing
+        optim_weights = fill(convert(T, 1.), 4*nplanet-2)
+    end
 
     # Check and initialize default prior weights
     if prior_weights !== nothing && length(prior_weights) != 5 * nplanet + 1
@@ -55,10 +66,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     end
 
     if prior_weights === nothing
-        fit_weight = vcat(fill(1e1, 4*nplanet-2), fill(0., 4*nplanet-2), fill(1e8, nplanet+3))
-    else
-        fit_weight = vcat(fill(1e1, 4*nplanet-2), prior_weights)
+        prior_weights = fill(zero(T), 4*nplanet-2), fill(1e8, nplanet+3)
     end
+
+    fit_weight = vcat(optim_weights, prior_weights)
 
     # Check and initialize default lower bounds
     if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet + 1
@@ -115,7 +126,7 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     init_optparams = optparams
 
     final_elems = orbit.final_elem
-    final_optparams = OptimParameters(nplanet, vcat(final_elems, 0.))
+    final_optparams = OptimParameters(nplanet, vcat(final_elems, zero(T)))
 
     # Calculate the differences for each elements
     diff_e = final_optparams.e - init_optparams.e
