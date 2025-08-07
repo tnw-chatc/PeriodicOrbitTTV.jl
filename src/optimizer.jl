@@ -18,10 +18,10 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `trace::Bool` : Show optimizer trace. False by default.
 - `eccmin::T` : The lower bounds for eccentricities
 - `maxit::Int64` : Maximum optimizer iterations
-- `optim_weights::Float64` : The weights of the optimization parameters. The length must equal `4*nplanet - 2`
-- `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet`
-- `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet`
-- `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet`
+- `optim_weights::Float64` : The weights of the optimization parameters. The length must equal `4*nplanet-2`
+- `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet+1`
+- `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
 """ 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
@@ -100,7 +100,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             fill(0.9, nplanet),
             fill(2π, nplanet),
             fill(2π, nplanet-1),
-            fill(0.5, nplanet-2),
+            fill(100.0, nplanet-2),
             2.0*365.242,
             fill(1e-2, nplanet),
             2.1,
@@ -108,7 +108,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             9*365.242,
         )
     end
-
+  
     # Use Autodiffed Jacobian if parsed
     if use_jac
         fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
