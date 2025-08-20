@@ -138,6 +138,7 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 @kwdef struct OrbitParameters{T<:Real}
     nplanet::Int
     cfactor::Vector{T}
+    obstmax::T
 end
 
 """
@@ -357,4 +358,97 @@ function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
 
     # Negates the time since we want to reverse it
     return -tp
+end
+
+# ========
+# Transit Timing Variation
+# ========
+
+"""Create ElementsIC based on `Orbit` structure."""
+function create_elem_ic(orbit)
+    ic = orbit.ic
+    state = orbit.s
+
+    elems = get_orbital_elements(state, ic)
+    anoms = get_anomalies(state, ic)
+
+    # Constructing vector
+    elem_mat = reduce(vcat, 
+        [[orbit.s.m[i], elems[i].P, 0., elems[i].e*cos(elems[i].ω), elems[i].e*sin(elems[i].ω), deg2rad(90.), 0.]' 
+            for i = 1:orbit.nplanet+1])
+
+    elem_mat[:,3] = vcat(0., M2t0.([anoms[i][2] for i in 1:orbit.nplanet], [elems[i+1].e for i in 1:orbit.nplanet], [elems[i+1].P for i in 1:orbit.nplanet], [elems[i+1].ω for i in 1:orbit.nplanet]))
+    
+    return ElementsIC(0., orbit.nplanet+1, elem_mat)
+end
+
+"""Compute transit timing"""
+function compute_tt(orbit, elemIC, tmax)
+    tt = TransitTiming(tmax, elemIC)
+
+    h = 0.01 * get_orbital_elements(orbit.s, orbit.ic)[2].P
+    intr = Integrator(h, 0.0, tmax)
+
+    ss = deepcopy(orbit.s)
+    ss.x .= RotXYZ(pi/2,0,0) * ss.x
+    ss.v .= RotXYZ(pi/2,0,0) * ss.v
+
+    # ss = State(elemIC)
+
+    intr(ss, tt, grad=true)
+
+    return tt
+end
+
+function match_transits(data, elements, tt, count, ntt)
+    ntransit = ntt === nothing ? size(data)[1] : ntt
+    ip = zeros(Int64,ntransit)
+    jp = zeros(Int64,ntransit)
+    
+    i = 1; ip0 = 0;
+    tmod = zeros(Float64,ntransit); j = 1;
+
+    # elements = create_elem_ic(orbit).elements
+
+    while i <= ntransit
+        ip[i] = data[i,1]+1
+        if ip[i] != ip0
+            j = 1
+            ip0 = ip[i]
+        end
+        tdiff = Inf
+        while j <= count[ip[i]] && tdiff > 0.1*elements[ip[i],2]
+            tdiff = abs(tt[ip[i],j] - data[i,3])
+            j += 1
+        end
+        
+        jp[i] = j-1
+        tmod[i] = tt[ip[i],jp[i]]
+        i += 1
+    end
+    return tmod,ip,jp
+end
+
+"""Compute the combined Jacobian for TransitTiming"""
+function compute_tt_jacobians(orbit::Orbit{T}, orbparams::OrbitParameters{T}, elemIC::ElementsIC, tt_data::Matrix{T}) where T <: Real
+    tt = compute_tt(orbit, elemIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
+
+    ntransit = size(tt_data)[1]
+
+    tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
+
+    # Helper function for rotating the orbit from xz- to xy-planes
+    function rotate_orbit(mat, angle=-pi/2)
+        new_mat = copy(mat)
+        rot_mat = RotXYZ(angle,0,0)
+        
+        new_mat[1:3,:] = rot_mat * mat[1:3,:]
+        new_mat[4:6,:] = rot_mat * mat[4:6,:]
+
+        return new_mat
+    end
+
+    raw_tt = [rotate_orbit(tt.dtdq0[ip[i],jp[i],:,:]) for i = 1:ntransit]
+
+    return permutedims(reduce(hcat, [reshape(raw_tt[i], :) for i = 1:ntransit]))
 end
