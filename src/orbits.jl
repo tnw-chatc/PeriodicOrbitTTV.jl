@@ -365,7 +365,7 @@ end
 # ========
 
 """Create ElementsIC based on `Orbit` structure."""
-function create_elem_ic(orbit)
+function create_elem_ic(orbit::Orbit{T}) where T <: Real
     ic = orbit.ic
     state = orbit.s
 
@@ -379,15 +379,15 @@ function create_elem_ic(orbit)
 
     elem_mat[:,3] = vcat(0., M2t0.([anoms[i][2] for i in 1:orbit.nplanet], [elems[i+1].e for i in 1:orbit.nplanet], [elems[i+1].P for i in 1:orbit.nplanet], [elems[i+1].ω for i in 1:orbit.nplanet]))
     
-    return ElementsIC(0., orbit.nplanet+1, elem_mat)
+    return ElementsIC(convert(T, 0.), orbit.nplanet+1, elem_mat)
 end
 
 """Compute transit timing"""
-function compute_tt(orbit, elemIC, tmax)
+function compute_tt(orbit::Orbit{T}, elemIC::ElementsIC{T}, tmax::T) where T <: Real
     tt = TransitTiming(tmax, elemIC)
 
     h = 0.01 * get_orbital_elements(orbit.s, orbit.ic)[2].P
-    intr = Integrator(h, 0.0, tmax)
+    intr = Integrator(h, convert(T, 0.0), tmax)
 
     ss = deepcopy(orbit.s)
     ss.x .= RotXYZ(pi/2,0,0) * ss.x
@@ -400,13 +400,13 @@ function compute_tt(orbit, elemIC, tmax)
     return tt
 end
 
-function match_transits(data, elements, tt, count, ntt)
+function match_transits(data::Matrix{T}, elements::Matrix{T}, tt::Matrix{T}, count::Vector{Int64}, ntt) where T <: Real
     ntransit = ntt === nothing ? size(data)[1] : ntt
     ip = zeros(Int64,ntransit)
     jp = zeros(Int64,ntransit)
     
     i = 1; ip0 = 0;
-    tmod = zeros(Float64,ntransit); j = 1;
+    tmod = zeros(T,ntransit); j = 1;
 
     # elements = create_elem_ic(orbit).elements
 
@@ -426,7 +426,7 @@ function match_transits(data, elements, tt, count, ntt)
         tmod[i] = tt[ip[i],jp[i]]
         i += 1
     end
-    return tmod,ip,jp
+    return tmod, ip, jp
 end
 
 """Compute the combined Jacobian for TransitTiming"""
