@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 Debugger = "31a5f54b-26ea-5ae9-a837-f05ce5417438"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -17,6 +18,7 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 Debugger = "0.7.11"
+DelimitedFiles = "1.9.1"
 FiniteDifferences = "0.12.32"
 ForwardDiff = "0.10.38"
 LinearAlgebra = "1.11.0"
