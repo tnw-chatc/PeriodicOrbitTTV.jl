@@ -126,7 +126,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
 
     function objective_function(_, p)
-        optparams = OptimParameters(nplanet, p[1:5*nplanet+1])
+        optparams = OptimParameters(nplanet, p)
 
         orbit = Orbit(nplanet, optparams, orbparams)
         elemIC = create_elem_ic(orbit)
@@ -141,7 +141,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     end
 
     function jacobian(_, p)
-        optparams = OptimParameters(nplanet, p[1:5*nplanet+1])
+        optparams = OptimParameters(nplanet, p)
 
         jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet, tt_data)
 
@@ -158,12 +158,12 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
     ttobs = tt_data[:,3]
 
-    optvec = [tovector(optparams); tmod]
+    optvec = tovector(optparams)
 
+    # Target is all zero with the prior and TTV information appended
+    ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec), deepcopy(ttobs))
     # Dummy data
-    xdata = zeros(T, length(optvec))
-    # Target is all zero with the prior appended
-    ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec[1:5*nplanet+1]), deepcopy(ttobs))
+    xdata = zeros(T, length(ydata))
 
     # Check and initialize default optimization weights 
     if optim_weights !== nothing && length(optim_weights) != 4 * nplanet - 2
@@ -195,8 +195,8 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     fit_weight = vcat(optim_weights, prior_weights, tt_weights)
 
     # Check and initialize default lower bounds
-    if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet + 1 + length(tmod)
-        error("Inconsistent lower bounds. Expected $(5 * nplanet + 1 + length(tmod)), got $(length(lower_bounds)) instead.")
+    if lower_bounds !== nothing && length(lower_bounds) != 5 * nplanet + 1
+        error("Inconsistent lower bounds. Expected $(5 * nplanet + 1), got $(length(lower_bounds)) instead.")
     end
 
     if lower_bounds === nothing
@@ -210,13 +210,12 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             1.9,
             -2π,
             7*365.242,
-            fill(0., length(tmod))
         )
     end
 
     # Check and initialize default upper bounds
-    if upper_bounds !== nothing && length(upper_bounds) != 5 * nplanet + 1 + length(tmod)
-        error("Inconsistent upper bounds. Expected $(5 * nplanet + 1 + length(tmod)), got $(length(upper_bounds)) instead.")
+    if upper_bounds !== nothing && length(upper_bounds) != 5 * nplanet + 1
+        error("Inconsistent upper bounds. Expected $(5 * nplanet + 1), got $(length(upper_bounds)) instead.")
     end
 
     if upper_bounds === nothing
@@ -230,7 +229,6 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
             2.1,
             2π,
             9*365.242,
-            fill(100000., length(tmod))
         )
     end
   
@@ -302,8 +300,5 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
 
     the_jac = [obj_jac; tt_jac]
 
-    zero_entries = zeros(T, size(the_jac,1), size(tt_jac,1))
-
-    # return [obj_jac; tt_jac]
-    return hcat(the_jac, zero_entries)
+    return the_jac
 end
