@@ -129,11 +129,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         optparams = OptimParameters(nplanet, p)
 
         orbit = Orbit(nplanet, optparams, orbparams)
-        elemIC = create_elem_ic(orbit)
-        tt = compute_tt(orbit, elemIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
+        tt = compute_tt(orbit, orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
         # Append the TT information
-        tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
+        tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
 
         diff_squared = compute_diff_squared(optparams, orbparams, nplanet, tmod)
 
@@ -151,11 +150,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     nplanet = orbparams.nplanet
 
     orbit = Orbit(nplanet, optparams, orbparams)
-    elemIC = create_elem_ic(orbit)
-    tt = compute_tt(orbit, elemIC, orbparams.obstmax)
+    tt = compute_tt(orbit, orbit.ic, orbparams.obstmax)
 
     # Append the TT information
-    tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
+    tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
     ttobs = tt_data[:,3]
 
     optvec = tovector(optparams)
@@ -292,9 +290,8 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
     obj_jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet)
 
     orbit = Orbit(nplanet, optparams, orbparams)
-    elemIC = create_elem_ic(orbit)
 
-    jac_tt_1 = compute_tt_jacobians(orbit, orbparams, elemIC, tt_data)
+    jac_tt_1 = compute_tt_jacobians(orbit, orbparams, orbit.ic, tt_data)
 
     tt_jac = jac_tt_1 * orbit.jac_1[1:end-1,:]
 

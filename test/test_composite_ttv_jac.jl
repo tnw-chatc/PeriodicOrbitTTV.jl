@@ -24,23 +24,21 @@ orbit_0 = Orbit(nplanet, optparams, orbparams)
 
 using DelimitedFiles
 using PeriodicOrbit: compute_tt_jacobians
-elemIC = create_elem_ic(orbit_0)
 
 tt_data = convert(Matrix{BigFloat}, readdlm("test/ttv_test_data.in",',',comments=true,comment_char='#'));
 
-tt = compute_tt(orbit_0, elemIC, orbparams.obstmax)
+tt = compute_tt(orbit_0, orbit_0.ic, orbparams.obstmax)
 
-tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
+tmod, ip, jp = match_transits(tt_data, orbit_0, tt.tt, tt.count, nothing)
 
 function fff(x)
     optparams = OptimParameters(nplanet, x)
 
     orbit = Orbit(nplanet, optparams, orbparams)
-    elemIC = create_elem_ic(orbit)
-    tt = compute_tt(orbit, elemIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
+    tt = compute_tt(orbit, orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
     # Append the TT information
-    tmod, ip, jp = match_transits(tt_data, elemIC.elements, tt.tt, tt.count, nothing)
+    tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
 
     diff_squared = compute_diff_squared(optparams, orbparams, nplanet, tmod)
 

@@ -156,6 +156,36 @@ end
 # Special function for the primary body
 RealElements(m::T) where T <: Real = RealElements(m, zeros(T, 10)...)
 
+function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
+    elems = RealElements[]
+    μs = get_relative_Jacobi_masses(masses)
+    n = length(masses)
+    Hmat = hierarchy([n, ones(Int64,n-1)...])
+    amat = NbodyGradient.amatrix(Hmat, masses)
+    X, V = get_relative_Jacobi_positions(x, v, n, amat)
+
+    push!(elems, RealElements(masses[1]))  # Central body
+    i = 1; b = 0
+    while i < length(masses)
+        if first(Hmat[i, :]) == zero(T)
+            b += 1
+        end
+        a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[:,i+b], V[:,i+b], μs[i+b], convert(T, time))
+        # TODO: Make sure if these conversions are a good thing to do...?
+        push!(elems, RealElements(masses[i+1], 2π / n, convert(T, 0.0), e*cos(ω), e*sin(ω), I, convert(T, Ω), a, e, ω, τ))
+        if b > 0
+            b -= 2
+        elseif b < 0
+            i += 1
+        end
+        i += 1
+    end
+    return elems
+end
+
+# Allow calling the function using `State` and `ic` instead of Cartesians
+get_Jacobi_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_Jacobi_orbital_elements(s.x, s.v, ic.m; time=s.t[1])
+
 function get_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     elems = RealElements[]
     μs = get_relative_masses(masses)
