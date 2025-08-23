@@ -27,7 +27,7 @@ using PeriodicOrbit: compute_tt_jacobians
 
 tt_data = convert(Matrix{BigFloat}, readdlm("test/ttv_test_data.in",',',comments=true,comment_char='#'));
 
-tt = compute_tt(orbit_0, orbit_0.ic, orbparams.obstmax)
+tt = compute_tt(orbit_0.ic, orbparams.obstmax)
 
 tmod, ip, jp = match_transits(tt_data, orbit_0, tt.tt, tt.count, nothing)
 
@@ -35,7 +35,7 @@ function fff(x)
     optparams = OptimParameters(nplanet, x)
 
     orbit = Orbit(nplanet, optparams, orbparams)
-    tt = compute_tt(orbit, orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
+    tt = compute_tt(orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
     # Append the TT information
     tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)

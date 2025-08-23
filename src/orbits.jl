@@ -364,27 +364,26 @@ end
 # Transit Timing Variation
 # ========
 
-# """Deprecated: Create ElementsIC based on `Orbit` structure."""
-# function create_elem_ic(orbit::Orbit{T}) where T <: Real
-#     ic = orbit.ic
-#     state = orbit.s
-
-#     elems = get_orbital_elements(state, ic)
-#     anoms = get_anomalies(state, ic)
-
-#     # Constructing vector
-#     elem_mat = reduce(vcat, 
-#         [[orbit.s.m[i], elems[i].P, 0., elems[i].e*cos(elems[i].ω), elems[i].e*sin(elems[i].ω), deg2rad(90.), 0.]' 
-#             for i = 1:orbit.nplanet+1])
-
-#     elem_mat[:,3] = vcat(0., M2t0.([anoms[i][2] for i in 1:orbit.nplanet], [elems[i+1].e for i in 1:orbit.nplanet], [elems[i+1].P for i in 1:orbit.nplanet], [elems[i+1].ω for i in 1:orbit.nplanet]))
-    
-#     return ElementsIC(convert(T, 0.), orbit.nplanet+1, elem_mat)
-# end
-
 """Compute transit timing"""
-function compute_tt(orbit::Orbit{T}, cartIC::CartesianIC{T}, tmax::T) where T <: Real
+function compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
     tt = TransitTiming(tmax, cartIC)
+
+    arb_state = State(cartIC)
+
+    h = 0.01 * get_orbital_elements(arb_state, cartIC)[2].P
+    intr = Integrator(h, convert(T, 0.0), tmax)
+
+    ss = deepcopy(arb_state)
+    ss.x .= RotXYZ(pi/2,0,0) * ss.x
+    ss.v .= RotXYZ(pi/2,0,0) * ss.v
+
+    intr(ss, tt, grad=true)
+
+    return tt
+end
+
+function compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
+    tt = TransitTiming(tmax, orbit.ic)
 
     h = 0.01 * get_orbital_elements(orbit.s, orbit.ic)[2].P
     intr = Integrator(h, convert(T, 0.0), tmax)
@@ -430,7 +429,7 @@ end
 
 """Compute the combined Jacobian for TransitTiming"""
 function compute_tt_jacobians(orbit::Orbit{T}, orbparams::OrbitParameters{T}, cartIC::CartesianIC, tt_data::Matrix{T}) where T <: Real
-    tt = compute_tt(orbit, cartIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
+    tt = compute_tt(cartIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
     ntransit = size(tt_data)[1]
 

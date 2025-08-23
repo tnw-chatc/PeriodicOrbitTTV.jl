@@ -129,7 +129,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         optparams = OptimParameters(nplanet, p)
 
         orbit = Orbit(nplanet, optparams, orbparams)
-        tt = compute_tt(orbit, orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
+        tt = compute_tt(orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
         # Append the TT information
         tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
@@ -150,7 +150,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     nplanet = orbparams.nplanet
 
     orbit = Orbit(nplanet, optparams, orbparams)
-    tt = compute_tt(orbit, orbit.ic, orbparams.obstmax)
+    tt = compute_tt(orbit.ic, orbparams.obstmax)
 
     # Append the TT information
     tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
