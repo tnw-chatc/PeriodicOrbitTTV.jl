@@ -1,4 +1,4 @@
-using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC, Derivatives
+using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC, Derivatives, TransitTiming
 using NbodyGradient: kepler, ekepler, zero_out!
 using Rotations
 using LinearAlgebra: dot
@@ -138,6 +138,7 @@ Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `ma
 @kwdef struct OrbitParameters{T<:Real}
     nplanet::Int
     cfactor::Vector{T}
+    obstmax::T
 end
 
 """
@@ -357,4 +358,114 @@ function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
 
     # Negates the time since we want to reverse it
     return -tp
+end
+
+# ========
+# Transit Timing Variation
+# ========
+
+"""Compute transit timing"""
+function compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
+    tt = TransitTiming(tmax, cartIC)
+
+    arb_state = State(cartIC)
+
+    h = 0.01 * get_orbital_elements(arb_state, cartIC)[2].P
+    intr = Integrator(h, convert(T, 0.0), tmax)
+
+    ss = deepcopy(arb_state)
+    ss.x .= RotXYZ(pi/2,0,0) * ss.x
+    ss.v .= RotXYZ(pi/2,0,0) * ss.v
+
+    intr(ss, tt, grad=true)
+
+    return tt
+end
+
+function compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
+    tt = TransitTiming(tmax, orbit.ic)
+
+    h = 0.01 * get_orbital_elements(orbit.s, orbit.ic)[2].P
+    intr = Integrator(h, convert(T, 0.0), tmax)
+
+    ss = deepcopy(orbit.s)
+    ss.x .= RotXYZ(pi/2,0,0) * ss.x
+    ss.v .= RotXYZ(pi/2,0,0) * ss.v
+
+    intr(ss, tt, grad=true)
+
+    return tt
+end
+
+function match_transits(data::Matrix{T}, orbit::Orbit{T}, tt::Matrix{T}, count::Vector{Int64}, ntt) where T <: Real
+    ntransit = ntt === nothing ? size(data)[1] : ntt
+    ip = zeros(Int64,ntransit)
+    jp = zeros(Int64,ntransit)
+    
+    i = 1; ip0 = 0;
+    tmod = zeros(T,ntransit); j = 1;
+
+    # elements = create_elem_ic(orbit).elements
+    periods = [get_Jacobi_orbital_elements(orbit.s, orbit.ic)[i].P for i in 1:orbit.ic.nbody]
+
+    while i <= ntransit
+        ip[i] = data[i,1]+1
+        if ip[i] != ip0
+            j = 1
+            ip0 = ip[i]
+        end
+        tdiff = Inf
+        while j <= count[ip[i]] && tdiff > 0.1*periods[ip[i]]
+            tdiff = abs(tt[ip[i],j] - data[i,3])
+            j += 1
+        end
+        
+        jp[i] = j-1
+        tmod[i] = tt[ip[i],jp[i]]
+        i += 1
+    end
+    return tmod, ip, jp
+end
+
+"""Compute the combined Jacobian for TransitTiming"""
+function compute_tt_jacobians(orbit::Orbit{T}, orbparams::OrbitParameters{T}, cartIC::CartesianIC, tt_data::Matrix{T}) where T <: Real
+    tt = compute_tt(cartIC, orbparams.obstmax) # TODO: Get rid of the hardcode here
+
+    ntransit = size(tt_data)[1]
+
+    tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
+
+    # Helper function for rotating the orbit from xz- to xy-planes
+    function rotate_orbit(mat, angle=-pi/2)
+        new_mat = copy(mat)
+        rot_mat = RotXYZ(angle,0,0)
+        
+        new_mat[1:3,:] = rot_mat * mat[1:3,:]
+        new_mat[4:6,:] = rot_mat * mat[4:6,:]
+
+        return new_mat
+    end
+
+    raw_tt = [rotate_orbit(tt.dtdq0[ip[i],jp[i],:,:]) for i = 1:ntransit]
+
+    return permutedims(reduce(hcat, [reshape(raw_tt[i], :) for i = 1:ntransit]))
+end
+
+"""Temporary TransitTiming structure"""
+function TransitTiming(tmax::T,ic::CartesianIC{T},ti::Int64=1) where T<:AbstractFloat
+    n = ic.nbody
+    temp_state = State(ic)
+    periods = [get_Jacobi_orbital_elements(temp_state, ic)[i].P for i in 1:ic.nbody]
+    ind = isfinite.(tmax./periods)
+    ntt = maximum(ceil.(Int64,abs.(tmax./periods[ind])).+3)
+    tt = zeros(T,n,ntt)
+    dtdq0 = zeros(T,n,ntt,7,n)
+    dtdelements = zeros(T,n,ntt,7,n)
+    count = zeros(Int64,n)
+    occs = setdiff(collect(1:n),ti)
+    dtdq = zeros(T,1,7,n)
+    gsave = zeros(T,n)
+    s_prior = State(ic)
+    s_transit = State(ic)
+    return TransitTiming(tt,dtdq0,dtdelements,count,ntt,ti,occs,dtdq,gsave,s_prior,s_transit)
 end

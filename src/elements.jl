@@ -92,16 +92,15 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     )
 end
 
-# TODO: Properly deprecate this function as we no longer use `ic` as an argument
-function get_relative_masses(ic::InitialConditions)
-    N = length(ic.m)
+# Return Jacobi relative masses if passed with an IC instead of mass vector
+function get_relative_Jacobi_masses(masses::Vector{T}) where T <: Real
+    N = length(masses)
     M = zeros(N-1)
     G = 39.4845/(365.242 * 365.242) # AU^3 Msol^-1 Day^-2
     Hmat = hierarchy([N, ones(Int64,N-1)...])
     for i in 1:N-1
         for j in 1:N
-            M[i] += abs(Hmat[i,j])*ic.m[j]
-            # M[i] += abs(ic.ϵ[i,j])*ic.m[j]
+            M[i] += abs(Hmat[i,j])*masses[j]
         end
     end
 
@@ -119,6 +118,18 @@ end
 function get_relative_positions(x,v)
     X = x[:,2:end] .- x[:,1]
     V = v[:,2:end] .- v[:,1]
+
+    return X, V
+end
+
+""" Calculate the relative Jacobi positions from the A-Matrix. """
+function get_relative_Jacobi_positions(x,v,nbody,amat)
+    n = nbody
+    X = zeros(3,n)
+    V = zeros(3,n)
+
+    X .= permutedims(amat*x')
+    V .= permutedims(amat*v')
 
     return X, V
 end
@@ -144,6 +155,36 @@ end
 
 # Special function for the primary body
 RealElements(m::T) where T <: Real = RealElements(m, zeros(T, 10)...)
+
+function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
+    elems = RealElements[]
+    μs = get_relative_Jacobi_masses(masses)
+    n = length(masses)
+    Hmat = hierarchy([n, ones(Int64,n-1)...])
+    amat = NbodyGradient.amatrix(Hmat, masses)
+    X, V = get_relative_Jacobi_positions(x, v, n, amat)
+
+    push!(elems, RealElements(masses[1]))  # Central body
+    i = 1; b = 0
+    while i < length(masses)
+        if first(Hmat[i, :]) == zero(T)
+            b += 1
+        end
+        a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[:,i+b], V[:,i+b], μs[i+b], convert(T, time))
+        # TODO: Make sure if these conversions are a good thing to do...?
+        push!(elems, RealElements(masses[i+1], 2π / n, convert(T, 0.0), e*cos(ω), e*sin(ω), I, convert(T, Ω), a, e, ω, τ))
+        if b > 0
+            b -= 2
+        elseif b < 0
+            i += 1
+        end
+        i += 1
+    end
+    return elems
+end
+
+# Allow calling the function using `State` and `ic` instead of Cartesians
+get_Jacobi_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_Jacobi_orbital_elements(s.x, s.v, ic.m; time=s.t[1])
 
 function get_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     elems = RealElements[]
@@ -201,3 +242,30 @@ end
 # Allow calling the function using `State` and `ic` instead of Cartesians
 get_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_anomalies(s.x, s.v, ic.m; time=s.t[1])
 
+function get_Jacobi_anomalies(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
+    anoms = Vector[]
+    μs = get_relative_Jacobi_masses(masses)
+    n = length(masses)
+    Hmat = hierarchy([n, ones(Int64,n-1)...])
+    amat = NbodyGradient.amatrix(Hmat, masses)
+    X, V = get_relative_Jacobi_positions(x, v, n, amat)
+
+    i = 1; b = 0
+    while i < length(masses)
+        if first(Hmat[i, :]) == zero(T)
+            b += 1
+        end
+        a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[:,i+b], V[:,i+b], μs[i+b], convert(T, time))
+        push!(anoms, [f, M, E])
+        if b > 0
+            b -= 2
+        elseif b < 0
+            i += 1
+        end
+        i += 1
+    end
+    return anoms
+end
+
+# Allow calling the function using `State` and `ic` instead of Cartesians
+get_Jacobi_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_Jacobi_anomalies(s.x, s.v, ic.m; time=s.t[1])
