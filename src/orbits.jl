@@ -2,6 +2,7 @@ using NbodyGradient: State, Elements, ElementsIC, InitialConditions, CartesianIC
 using NbodyGradient: kepler, ekepler, zero_out!
 using Rotations
 using LinearAlgebra: dot
+using LsqFit: curve_fit
 
 using ForwardDiff
 
@@ -468,4 +469,24 @@ function TransitTiming(tmax::T,ic::CartesianIC{T},ti::Int64=1) where T<:Abstract
     s_prior = State(ic)
     s_transit = State(ic)
     return TransitTiming(tt,dtdq0,dtdelements,count,ntt,ti,occs,dtdq,gsave,s_prior,s_transit)
+end
+
+"""Helper function for characterizing the inner period."""
+function estimate_inner_period(data::Matrix{T}, p0::Vector{T}) where T <: Real
+    # Get all rows with TT of the first planet
+    ftt = data[data[:,1] .== one(T),2:end]
+
+    if size(ftt, 1) == 1
+        error("Unable to determine the inner period. Need more than one transits")
+    end
+    
+    # Fit the data to a linear model to extract its slope
+    @. linear_model(x, p) = p[1]*x + p[2]
+    xdata = ftt[:,1]
+    ydata = ftt[:,2]
+
+    fit_results = curve_fit(linear_model, xdata, ydata, p0)
+
+    # Its slope should be a good first guess
+    return fit_results.param[1]
 end
