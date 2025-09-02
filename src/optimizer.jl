@@ -22,10 +22,11 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet+1`
 - `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
 - `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `scale_factor::Float64` : The scale factor to help the optimization perform better. The lenght must equal `5*nplanet+1`. Each element should have the same order of magnitude as the corresponding element of the optimization vector.
 """ 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
-    prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
+    prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 
     function objective_function(_, θ)
         p = scale_factor .* θ
@@ -50,18 +51,24 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     optvec = tovector(optparams)
     nplanet = orbparams.nplanet
 
-    scale_factor = reduce(vcat, [
-        fill(1e-3, nplanet),
-        fill(1., nplanet),
-        fill(1., nplanet-1),
-        fill(1e-3, nplanet-2),
-        fill(1e3, 1),
-        fill(1e-5, nplanet),
-        fill(1, 1),
-        fill(1, 1),
-        fill(1e4, 1),
-    ])
+    # Check and initialize default scale factor
+    if scale_factor !== nothing && length(scale_factor) != 5 * nplanet + 1
+        error("Inconsistent optimization weights. Expected $(5 * nplanet + 1), got $(length(scale_factor)) instead.")
+    end
 
+    if scale_factor === nothing
+        scale_factor = reduce(vcat, [
+            fill(1e-3, nplanet),
+            fill(1., nplanet),
+            fill(1., nplanet-1),
+            fill(1e-3, nplanet-2),
+            fill(1e3, 1),
+            fill(1e-5, nplanet),
+            fill(1, 1),
+            fill(1, 1),
+            fill(1e4, 1),
+        ])
+    end
 
     # Dummy data
     xdata = zeros(T, length(optvec))
@@ -140,7 +147,7 @@ end
 """Routine for finding PO with a TT constraint"""
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
-    prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
+    prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 
     function objective_function(_, θ)
         p = scale_factor .* θ
@@ -170,17 +177,24 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 
     nplanet = orbparams.nplanet
 
-    scale_factor = reduce(vcat, [
-        fill(1e-3, nplanet),
-        fill(1., nplanet),
-        fill(1., nplanet-1),
-        fill(1e-3, nplanet-2),
-        fill(1e3, 1),
-        fill(1e-5, nplanet),
-        fill(1, 1),
-        fill(1, 1),
-        fill(1e4, 1),
-    ])
+    # Check and initialize default scale factor
+    if scale_factor !== nothing && length(scale_factor) != 5 * nplanet + 1
+        error("Inconsistent optimization weights. Expected $(5 * nplanet + 1), got $(length(scale_factor)) instead.")
+    end
+
+    if scale_factor === nothing
+        scale_factor = reduce(vcat, [
+            fill(1e-3, nplanet),
+            fill(1., nplanet),
+            fill(1., nplanet-1),
+            fill(1e-3, nplanet-2),
+            fill(1e3, 1),
+            fill(1e-5, nplanet),
+            fill(1, 1),
+            fill(1, 1),
+            fill(1e4, 1),
+        ])
+    end
 
     orbit = Orbit(nplanet, optparams, orbparams)
     tt = compute_tt(orbit.ic, orbparams.obstmax)
