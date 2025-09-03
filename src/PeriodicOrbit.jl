@@ -12,7 +12,7 @@ export get_Jacobi_orbital_elements, get_Jacobi_anomalies
 export integrate_to_M!
 export optimize!
 
-export orbital_to_cartesian, compute_derivatives, match_transits, compute_tt_jacobians, estimate_period
+export orbital_to_cartesian, compute_derivatives, match_transits, compute_tt_jacobians, estimate_period, calculate_period_deviation, estimate_initial_M, param_diff
 
 # For debugging
 export mag
@@ -22,5 +22,6 @@ include("orbits.jl")
 include("elements.jl")
 include("optimizer.jl")
 include("orbital_converter.jl")
+include("utils.jl")
 
 end # module PeriodicOrbit
