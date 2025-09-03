@@ -12,7 +12,7 @@ export get_Jacobi_orbital_elements, get_Jacobi_anomalies
 export integrate_to_M!
 export optimize!
 
-export orbital_to_cartesian, compute_derivatives, match_transits, compute_tt_jacobians, estimate_inner_period
+export orbital_to_cartesian, compute_derivatives, match_transits, compute_tt_jacobians, estimate_period
 
 # For debugging
 export mag

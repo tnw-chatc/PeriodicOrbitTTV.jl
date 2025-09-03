@@ -472,21 +472,39 @@ function TransitTiming(tmax::T,ic::CartesianIC{T},ti::Int64=1) where T<:Abstract
 end
 
 """Helper function for characterizing the inner period."""
-function estimate_inner_period(data::Matrix{T}, p0::Vector{T}) where T <: Real
+function estimate_period(data::Matrix{T}, index::Int, p0::Vector{T}) where T <: Real
     # Get all rows with TT of the first planet
-    ftt = data[data[:,1] .== one(T),2:end]
+    ftt = data[data[:,1] .== index,2:end]
 
     if size(ftt, 1) == 1
         error("Unable to determine the inner period. Need more than one transits")
     end
     
-    # Fit the data to a linear model to extract its slope
+    # Fit the data to a linear model
     @. linear_model(x, p) = p[1]*x + p[2]
     xdata = ftt[:,1]
     ydata = ftt[:,2]
 
     fit_results = curve_fit(linear_model, xdata, ydata, p0)
 
-    # Its slope should be a good first guess
-    return fit_results.param[1]
+    return fit_results.param, linear_model(xdata, fit_results.param)
+end
+
+"""Helper function to calculate kappa and period ratio deviation"""
+function calculate_period_deviation(periods::Vector{T}, cfactor::Vector{T}) where T <: Real
+    nplanet = length(periods)
+    
+    kappa = periods[2] / periods[1]
+
+    # Period ratio deviation
+    pratio_nom = Vector{T}(undef, nplanet-1)
+    pratio_nom[1] = kappa
+
+    for i = 2:nplanet-1
+        pratio_nom[i] = 1/(1 + cfactor[i-1]*(1 - pratio_nom[i-1]))
+    end 
+
+    pratiodev = [(periods[i] / periods[i-1]) - pratio_nom[i-1] for i in eachindex(periods)[3:end]]
+
+    return kappa, pratiodev
 end
