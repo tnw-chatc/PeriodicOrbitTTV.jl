@@ -22,12 +22,15 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet+1`
 - `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
 - `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `scale_factor::Float64` : The scale factor to help the optimization perform better. The lenght must equal `5*nplanet+1`. Each element should have the same order of magnitude as the corresponding element of the optimization vector.
 """ 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
-    prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
+    prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 
-    function objective_function(_, p)
+    function objective_function(_, θ)
+        p = scale_factor .* θ
+
         optparams = OptimParameters(nplanet, p)
 
         diff_squared = compute_diff_squared(optparams, orbparams, nplanet)
@@ -35,16 +38,37 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         return diff_squared
     end
 
-    function jacobian(_, p)
+    function jacobian(_, θ)
+        p = scale_factor .* θ
+
         optparams = OptimParameters(nplanet, p)
 
         jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet)
 
-        return jac
+        return jac .* scale_factor'
     end 
 
     optvec = tovector(optparams)
     nplanet = orbparams.nplanet
+
+    # Check and initialize default scale factor
+    if scale_factor !== nothing && length(scale_factor) != 5 * nplanet + 1
+        error("Inconsistent optimization weights. Expected $(5 * nplanet + 1), got $(length(scale_factor)) instead.")
+    end
+
+    if scale_factor === nothing
+        scale_factor = reduce(vcat, [
+            fill(1e-3, nplanet),
+            fill(1., nplanet),
+            fill(1., nplanet-1),
+            fill(1e-3, nplanet-2),
+            fill(1e3, 1),
+            fill(1e-5, nplanet),
+            fill(1, 1),
+            fill(1, 1),
+            fill(1e4, 1),
+        ])
+    end
 
     # Dummy data
     xdata = zeros(T, length(optvec))
@@ -111,21 +135,23 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
   
     # Use Autodiffed Jacobian if parsed
     if use_jac
-        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
+        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec ./ scale_factor, lower=lower_bounds ./ scale_factor, upper=upper_bounds ./ scale_factor; maxIter=maxit, show_trace=trace)
     else
-        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
+        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec ./ scale_factor, lower=lower_bounds ./ scale_factor, upper=upper_bounds ./ scale_factor; maxIter=maxit, show_trace=trace)
     end
 
     # Parse the LsqFit object 
-    return fit
+    return fit, scale_factor
 end
 
 """Routine for finding PO with a TT constraint"""
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
-    prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing) where T <: Real
+    prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 
-    function objective_function(_, p)
+    function objective_function(_, θ)
+        p = scale_factor .* θ
+
         optparams = OptimParameters(nplanet, p)
 
         orbit = Orbit(nplanet, optparams, orbparams)
@@ -139,15 +165,36 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         return diff_squared
     end
 
-    function jacobian(_, p)
+    function jacobian(_, θ)
+        p = scale_factor .* θ
+
         optparams = OptimParameters(nplanet, p)
 
         jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet, tt_data)
 
-        return jac
+        return jac .* scale_factor'
     end 
 
     nplanet = orbparams.nplanet
+
+    # Check and initialize default scale factor
+    if scale_factor !== nothing && length(scale_factor) != 5 * nplanet + 1
+        error("Inconsistent optimization weights. Expected $(5 * nplanet + 1), got $(length(scale_factor)) instead.")
+    end
+
+    if scale_factor === nothing
+        scale_factor = reduce(vcat, [
+            fill(1e-3, nplanet),
+            fill(1., nplanet),
+            fill(1., nplanet-1),
+            fill(1e-3, nplanet-2),
+            fill(1e3, 1),
+            fill(1e-5, nplanet),
+            fill(1, 1),
+            fill(1, 1),
+            fill(1e4, 1),
+        ])
+    end
 
     orbit = Orbit(nplanet, optparams, orbparams)
     tt = compute_tt(orbit.ic, orbparams.obstmax)
@@ -232,13 +279,13 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
   
     # Use Autodiffed Jacobian if parsed
     if use_jac
-        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
+        fit = curve_fit(objective_function, jacobian, xdata, ydata, fit_weight, optvec ./ scale_factor, lower=lower_bounds ./ scale_factor, upper=upper_bounds ./ scale_factor; maxIter=maxit, show_trace=trace)
     else
-        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec, lower=lower_bounds, upper=upper_bounds; maxIter=maxit, show_trace=trace)
+        fit = curve_fit(objective_function, xdata, ydata, fit_weight, optvec ./ scale_factor, lower=lower_bounds ./ scale_factor, upper=upper_bounds ./ scale_factor; maxIter=maxit, show_trace=trace)
     end
 
     # Parse the LsqFit object 
-    return fit
+    return fit, scale_factor
 end
 
 function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
