@@ -37,8 +37,9 @@ mutable struct Orbit{T<:Real}
 
     final_elem::Vector{T}
     state_final::State # State after integration for testing only
+    init_elem::Vector{T}
 
-    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, final_elem::Vector{T}, state_final::State) where T <: Real
+    function Orbit(s::State, ic::InitialConditions, κ::T, jac_1::Matrix{T}, jac_2::Matrix{T}, jac_3::Matrix{T}, final_elem::Vector{T}, state_final::State, init_elem::Vector{T}) where T <: Real
 
         # Gets the number of planets
         nplanet = ic.nbody - 1
@@ -46,7 +47,7 @@ mutable struct Orbit{T<:Real}
         jac_combined = jac_3 * jac_2 * jac_1
         # jac_combined = Matrix{T}(undef, 0, 0)
     
-        new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem, state_final)
+        new{T}(s, ic, κ, nplanet, jac_1, jac_2, jac_3, jac_combined, final_elem, state_final, init_elem)
     end
 end
 
@@ -174,6 +175,9 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
+    # # Export the elements for testing later
+    init_elem = extract_elements(deepcopy(s), ic, orbparams)
+
     # # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
@@ -186,7 +190,7 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     # # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
-    Orbit(s, ic, optparams.kappa, jac_1, jac_2, jac_3, final_elem, s_final)
+    Orbit(s, ic, optparams.kappa, jac_1, jac_2, jac_3, final_elem, s_final, init_elem)
 end
 
 """Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
