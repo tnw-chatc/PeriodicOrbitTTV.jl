@@ -44,7 +44,7 @@ end
 
 # Convenient function for us to check periodicity (though only preliminarily)
 function param_diff(nplanet, final_elems, init_elems)
-    init_optparams = OptimParameters(nplanet, init_elems)
+    init_optparams = OptimParameters(nplanet, vcat(init_elems, 0.))
 
     final_optparams = OptimParameters(nplanet, vcat(final_elems, 0.))
     

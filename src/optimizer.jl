@@ -290,21 +290,12 @@ end
 
 function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
-
-    init_optparams = optparams
-
+    
+    init_elems = orbit.init_elem
     final_elems = orbit.final_elem
-    final_optparams = OptimParameters(nplanet, vcat(final_elems, zero(T)))
 
-    # Calculate the differences for each elements
-    diff_e = final_optparams.e - init_optparams.e
-    diff_M = rem2pi.(final_optparams.M - init_optparams.M, RoundNearest)
-    diff_ωdiff = rem2pi.(final_optparams.Δω - init_optparams.Δω, RoundNearest)
-    diff_pratiodev = final_optparams.Pratio - init_optparams.Pratio
-    diff_inner_period = final_optparams.inner_period - init_optparams.inner_period
-
-    # Create a vector, and appended with constant quantities
-    diff = vcat(diff_e, diff_M, diff_ωdiff, diff_pratiodev, diff_inner_period)
+    # Compute diff using util function, excluding the last two elements (kappa and ω1)
+    diff = param_diff(nplanet, final_elems, init_elems)[1:end-2]
     
     priors = tovector(optparams)
 
