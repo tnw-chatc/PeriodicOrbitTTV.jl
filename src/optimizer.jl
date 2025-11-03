@@ -289,7 +289,7 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
 end
 
 """Routine for finding PO with a TT constraint with variable PO weights"""
-function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}, optim_sigmas::Vector{T}; 
+function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}, optim_sigma::T; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000,
     prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing, sigma_weights=nothing) where T <: Real
 
@@ -297,15 +297,16 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         p = scale_factor .* θ
 
         optparams = OptimParameters(nplanet, p[1:5nplanet+1])
-        po_sigmas = p[5nplanet+1+1:end]
+        po_sigma = p[end]
 
         orbit = Orbit(nplanet, optparams, orbparams)
         tt = compute_tt(orbit.ic, orbparams.obstmax) # TODO: Get rid of the hardcode here
 
         # Append the TT information
         tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
-
-        diff_squared = compute_diff_squared(optparams, orbparams, nplanet, tmod, po_sigmas)
+        diff_squared = compute_diff_squared(optparams, orbparams, nplanet, tmod, po_sigma)
+        typeof(diff_squared)
+        size(diff_squared)
 
         return diff_squared
     end
@@ -314,19 +315,19 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         p = scale_factor .* θ
 
         optparams = OptimParameters(nplanet, p[1:5nplanet+1])
-        po_sigmas = p[5nplanet+1+1:end]
+        po_sigma = p[end]
 
-        jac = compute_diff_squared_jacobian_var_weights(optparams, orbparams, nplanet, tt_data, po_sigmas)
+        jac = compute_diff_squared_jacobian_var_weights(optparams, orbparams, nplanet, tt_data, po_sigma)
 
         return jac .* scale_factor'
     end 
 
     nplanet = orbparams.nplanet
 
-    # Check and initialize default scale factor
-    if scale_factor !== nothing && length(scale_factor) != 9 * nplanet - 1
-        error("Inconsistent optimization weights. Expected $(9 * nplanet - 1), got $(length(scale_factor)) instead.")
-    end
+    # # Check and initialize default scale factor
+    # if scale_factor !== nothing && length(scale_factor) != 9 * nplanet - 1
+    #     error("Inconsistent optimization weights. Expected $(9 * nplanet - 1), got $(length(scale_factor)) instead.")
+    # end
 
     if scale_factor === nothing
         scale_factor = reduce(vcat, [
@@ -349,10 +350,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     tmod, ip, jp = match_transits(tt_data, orbit, tt.tt, tt.count, nothing)
     ttobs = tt_data[:,3]
 
-    optvec = vcat(tovector(optparams), optim_sigmas)
+    optvec = vcat(tovector(optparams), optim_sigma)
 
     # Target is all zero with the prior and TTV information appended
-    ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec[1:5*nplanet+1]), zeros(T, 4*nplanet-2), deepcopy(ttobs))
+    ydata = vcat(zeros(T, 4*nplanet-2), deepcopy(optvec[1:5*nplanet+1]), [1.], deepcopy(ttobs))
     # Dummy data
     xdata = zeros(T, length(ydata))
 
@@ -379,12 +380,12 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         sigma_weights = fill(1., 4nplanet-2)
     end
 
-    fit_weight = vcat(fill(1., 4nplanet-2), prior_weights, sigma_weights, tt_weights)
+    fit_weight = vcat(fill(1., 4nplanet-2), prior_weights, [1.], tt_weights)
 
-    # Check and initialize default lower bounds
-    if lower_bounds !== nothing && length(lower_bounds) != 9 * nplanet - 1
-        error("Inconsistent lower bounds. Expected $(9 * nplanet - 1), got $(length(lower_bounds)) instead.")
-    end
+    # # Check and initialize default lower bounds
+    # if lower_bounds !== nothing && length(lower_bounds) != 9 * nplanet - 1
+    #     error("Inconsistent lower bounds. Expected $(9 * nplanet - 1), got $(length(lower_bounds)) instead.")
+    # end
 
     if lower_bounds === nothing
         lower_bounds = vcat(
@@ -400,10 +401,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
         )
     end
 
-    # Check and initialize default upper bounds
-    if upper_bounds !== nothing && length(upper_bounds) != 9 * nplanet - 1
-        error("Inconsistent upper bounds. Expected $(9 * nplanet - 1), got $(length(upper_bounds)) instead.")
-    end
+    # # Check and initialize default upper bounds
+    # if upper_bounds !== nothing && length(upper_bounds) != 9 * nplanet - 1
+    #     error("Inconsistent upper bounds. Expected $(9 * nplanet - 1), got $(length(upper_bounds)) instead.")
+    # end
 
     if upper_bounds === nothing
         upper_bounds = vcat(
@@ -450,13 +451,13 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     return [obj_vec; ttmod]
 end
 
-function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, ttmod::Vector{T}, po_sigmas::Vector{T}) where T <: Real
+function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, ttmod::Vector{T}, po_sigma::T) where T <: Real
     obj_vec = compute_diff_squared(optparams, orbparams, nplanet)
 
     sigma_0 = 1e-16 # NOTE: Somewhat arbitrary here
-    ln_sigmas_sq = sqrt.(2 .* log.(po_sigmas ./ sigma_0))
+    ln_sigmas_sq = sqrt(2 * (4nplanet-2) * log(po_sigma / sigma_0))
 
-    return [obj_vec ./ vcat(po_sigmas, fill(1., 5nplanet+1)); ln_sigmas_sq; ttmod]
+    return [obj_vec ./ vcat(fill(po_sigma, 4nplanet-2), fill(1., 5nplanet+1)); ln_sigmas_sq; ttmod]
 end
 
 function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
@@ -489,7 +490,7 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
     return the_jac
 end
 
-function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, tt_data::Matrix{T}, po_sigmas::Vector{T}) where T <: Real
+function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, tt_data::Matrix{T}, po_sigma::T) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
     # Helper function for subtracting the matrix with identity
@@ -508,14 +509,12 @@ function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}
     # With identity matrix from variable weights 13N-3 * 9N-1
     sigma_0 = 1e-16
     ln_sigmas_vs_sigmas(sm) = 1 / (sm * sqrt(2*log(sm/sigma_0)))
-    matrix_sigma_vs_sigma = diagm(ln_sigmas_vs_sigmas.(po_sigmas))
+    matrix_sigma_vs_sigma = diagm([ln_sigmas_vs_sigmas(po_sigma)])
     diff_jac = cat(diff_jac, matrix_sigma_vs_sigma, dims=(1,2))
 
     # Correct derivatives ΔX_i vs w_i
     obj_vec = compute_diff_squared(optparams, orbparams, nplanet)[1:4nplanet-2]
-    for i in 1:4nplanet-2
-        diff_jac[i, 5nplanet+1 + i] =  -1 * obj_vec[i] / (po_sigmas[i]^2)
-    end
+    diff_jac[1:4nplanet-2, 5nplanet+2] .=  -1 .* obj_vec ./ (po_sigma^2)
 
     jac_tt_1 = compute_tt_jacobians(orbit, orbparams, orbit.ic, tt_data)
     tt_jac = jac_tt_1 * orbit.jac_1[1:end-1,:]
@@ -523,7 +522,7 @@ function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}
     dims, _ = size(tt_jac)
     # Vertically append the jacobian from TT with zero padding for weights
     # Dimension: (13N-3 + n.tt) * 9N-1
-    the_jac = [diff_jac; hcat(tt_jac, zeros(dims, 4nplanet-2))]
+    the_jac = [diff_jac; hcat(tt_jac, zeros(dims, 1))]
 
     return the_jac
 end
