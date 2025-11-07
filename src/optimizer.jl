@@ -455,9 +455,9 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     obj_vec = compute_diff_squared(optparams, orbparams, nplanet)
 
     sigma_0 = 1e-16 # NOTE: Somewhat arbitrary here
-    ln_sigmas_sq = sqrt(2 * (4nplanet-2) * log(po_sigma / sigma_0))
+    ln_sigmas_sq(sm) = sqrt(2 * (4nplanet-2) * log(sm / sigma_0))
 
-    return [obj_vec ./ vcat(fill(po_sigma, 4nplanet-2), fill(1., 5nplanet+1)); ln_sigmas_sq; ttmod]
+    return [obj_vec ./ vcat(fill(po_sigma, 4nplanet-2), fill(1., 5nplanet+1)); ln_sigmas_sq(po_sigma); ttmod]
 end
 
 function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
@@ -508,8 +508,11 @@ function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}
 
     # With identity matrix from variable weights 13N-3 * 9N-1
     sigma_0 = 1e-16
-    ln_sigmas_vs_sigmas(sm) = 1 / (sm * sqrt(2 * (4*nplanet-2) * log(sm/sigma_0)))
-    matrix_sigma_vs_sigma = diagm([ln_sigmas_vs_sigmas(po_sigma)])
+    # ln_sigmas_vs_sigmas(sm) = 1 / (sm * sqrt(2 * (4*nplanet-2) * log(sm/sigma_0)))
+    ln_sigmas_sq(sm) = sqrt(2 * (4nplanet-2) * log(sm / sigma_0))
+    derivative_ln_sigmas_sq = ForwardDiff.derivative(ln_sigmas_sq, po_sigma)
+
+    matrix_sigma_vs_sigma = diagm([derivative_ln_sigmas_sq])
     diff_jac = cat(diff_jac, matrix_sigma_vs_sigma, dims=(1,2))
 
     # Correct derivatives ΔX_i vs w_i
