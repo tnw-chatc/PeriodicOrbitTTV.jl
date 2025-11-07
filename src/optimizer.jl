@@ -508,7 +508,7 @@ function compute_diff_squared_jacobian_var_weights(optparams::OptimParameters{T}
 
     # With identity matrix from variable weights 13N-3 * 9N-1
     sigma_0 = 1e-16
-    ln_sigmas_vs_sigmas(sm) = 1 / (sm * sqrt(2*log(sm/sigma_0)))
+    ln_sigmas_vs_sigmas(sm) = 1 / (sm * sqrt(2 * (4*nplanet-2) * log(sm/sigma_0)))
     matrix_sigma_vs_sigma = diagm([ln_sigmas_vs_sigmas(po_sigma)])
     diff_jac = cat(diff_jac, matrix_sigma_vs_sigma, dims=(1,2))
 
