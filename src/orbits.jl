@@ -386,15 +386,15 @@ function compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
     return tt
 end
 
-function compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
+function compute_tt(orbit::Orbit{T}, tmax::T; t0=0.0) where T <: Real
     tt = TransitTiming(tmax, orbit.ic)
 
     h = 0.01 * get_orbital_elements(orbit.s, orbit.ic)[2].P
-    intr = Integrator(h, convert(T, 0.0), tmax)
+    intr = Integrator(h, convert(T, t0), t0 + tmax)
 
     ss = deepcopy(orbit.s)
-    ss.x .= RotXYZ(pi/2,0,0) * ss.x
-    ss.v .= RotXYZ(pi/2,0,0) * ss.v
+    ss.x .= RotXYZ(0,0,pi) * RotXYZ(pi/2,0,0) * ss.x
+    ss.v .= RotXYZ(0,0,pi) * RotXYZ(pi/2,0,0) * ss.v
 
     intr(ss, tt, grad=true)
 
