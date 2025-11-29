@@ -38,11 +38,18 @@ function calculate_period_deviation(periods::Vector{T}, cfactor::Vector{T}) wher
     return kappa, pratiodev
 end
 
+"""
+Estimate the initial Astrocentric mean anomalies that yields the first transit times at `tt1`
+"""
 function estimate_initial_M(tt1::Vector{T}, periods::Vector{T}, omegas::Vector{T}, t0::T=0.0) where T <: Real
     return [rem2pi((t0-tt1[i])*2pi/periods[i] - pi/2 - omegas[i], RoundNearest) for i in 1:length(periods)]
 end
 
-# Convenient function for us to check periodicity (though only preliminarily)
+"""
+Compare the final and initial optimization parameters
+
+Automatically handle angle modulus for mean anomalies, Δω, and ω1
+"""
 function param_diff(nplanet, final_elems, init_elems)
     init_optparams = OptimParameters(nplanet, vcat(init_elems, 0.))
 

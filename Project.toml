@@ -1,4 +1,4 @@
-name = "PeriodicOrbit"
+name = "PeriodicOrbitTTV"
 uuid = "39b8e391-62ca-4e8a-af42-0d151c329bad"
 authors = ["Tanawan Chatchadanoraset <tchatc24@uw.edu>"]
 version = "0.1.0"
