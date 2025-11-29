@@ -14,6 +14,9 @@ end
 
 using LinearAlgebra
 
+"""
+Convert relative Cartesian positions and velocities to orbital elements.
+"""
 function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <: Real
     R = norm(x)
     v2 = dot(v, v)
@@ -100,6 +103,7 @@ function get_relative_Jacobi_masses(masses::Vector{T}) where T <: Real
     Hmat = hierarchy([N, ones(Int64,N-1)...])
     for i in 1:N-1
         for j in 1:N
+            # TODO: Make this line compatible with ForwardDiff
             M[i] += abs(Hmat[i,j])*masses[j]
         end
     end
@@ -156,6 +160,9 @@ end
 # Special function for the primary body
 RealElements(m::T) where T <: Real = RealElements(m, zeros(T, 10)...)
 
+"""
+Calculate Jacobi orbital elements from cartesian positions and velocities.
+"""
 function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     elems = RealElements[]
     μs = get_relative_Jacobi_masses(masses)
@@ -183,9 +190,14 @@ function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{
     return elems
 end
 
-# Allow calling the function using `State` and `ic` instead of Cartesians
+"""
+Allow calling the function using `State` and `ic` instead of Cartesians
+"""
 get_Jacobi_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_Jacobi_orbital_elements(s.x, s.v, ic.m; time=s.t[1])
 
+"""
+Calculate Astrocentric orbital elements from cartesian positions and velocities.
+"""
 function get_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     elems = RealElements[]
     μs = get_relative_masses(masses)
@@ -212,9 +224,12 @@ function get_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; tim
     return elems
 end
 
-# Allow calling the function using `State` and `ic` instead of Cartesians
+"""Allow calling the function using `State` and `ic` instead of Cartesians"""
 get_orbital_elements(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_orbital_elements(s.x, s.v, ic.m; time=s.t[1])
 
+"""
+Calculate Astrocentric anomalies from cartesian positions and velocities.
+"""
 function get_anomalies(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     anoms = Vector[]
     μs = get_relative_masses(masses)
@@ -239,9 +254,12 @@ function get_anomalies(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) w
     return anoms
 end
 
-# Allow calling the function using `State` and `ic` instead of Cartesians
+"""Allow calling the function using `State` and `ic` instead of Cartesians"""
 get_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_anomalies(s.x, s.v, ic.m; time=s.t[1])
 
+"""
+Calculate Jacobi anomalies from cartesian positions and velocities.
+"""
 function get_Jacobi_anomalies(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     anoms = Vector[]
     μs = get_relative_Jacobi_masses(masses)
@@ -267,5 +285,5 @@ function get_Jacobi_anomalies(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; tim
     return anoms
 end
 
-# Allow calling the function using `State` and `ic` instead of Cartesians
+"""# Allow calling the function using `State` and `ic` instead of Cartesians"""
 get_Jacobi_anomalies(s::State{T}, ic::InitialConditions{T}) where T <: Real = get_Jacobi_anomalies(s.x, s.v, ic.m; time=s.t[1])
