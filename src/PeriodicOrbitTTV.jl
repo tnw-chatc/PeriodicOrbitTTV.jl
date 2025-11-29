@@ -1,4 +1,4 @@
-module PeriodicOrbit
+module PeriodicOrbitTTV
 __precompile__(false)
 
 using Rotations
@@ -24,4 +24,4 @@ include("optimizer.jl")
 include("orbital_converter.jl")
 include("utils.jl")
 
-end # module PeriodicOrbit
+end # module PeriodicOrbitTTV
