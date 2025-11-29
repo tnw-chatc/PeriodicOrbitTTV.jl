@@ -21,7 +21,8 @@ Orbit object encapsulates the information about `State` and `InittialConditions`
 - `jac_3::Matrix{T}` : The Jacobian for Cartesian to Orbital elements conversion
 - `jac_combined::Matrix{T}` : The combined Jacobian of the final elements w.r.t. initial elements
 
-- `final_elem::Vector{T}` : The final orbital elements after `tsys`
+- `init_elem::Vector{T}` : The initial orbital elements before integrated
+- `final_elem::Vector{T}` : The final orbital elements after integrated to `tsys`
 - `state_final::State` : The `State` structure corresponding to `final_elem`
 """
 mutable struct Orbit{T<:Real}
@@ -51,7 +52,7 @@ mutable struct Orbit{T<:Real}
     end
 end
 
-"""Optimization parameters."""
+"""Optimization parameters structure. All parameters should be in Astrocentric coordinates."""
 @kwdef struct OptimParameters{T<:Real}
     e::Vector{T}        # nplanet
     M::Vector{T}        # nplanet
@@ -115,22 +116,28 @@ function OptimParameters(N::Int, vec::Vector{T}) where T <: Real
     OptimParameters(e, M, Δω, Pratio, inner_period, masses, kappa, ω1, tsys)
 end
 
-# Converts OptimParameters to a vector
+"""
+    tovector(x::OptimParameters)
+
+Convert `x::OptimParameters` structure to a plain vector.
+"""
 tovector(x::OptimParameters) = reduce(vcat, [getfield(x, field) for field in fieldnames(typeof(x))])
 
 """
     OrbitParameters{T<:Real}
 
-Orbital parameters that will not be affected by the optimization
+Other system parameters that will not be affected (i.e., fixed) during the optimization.
 
 # Fields
 - `nplanet::Int` : The number of the planets
 - `cfactor::Vector{T}` : Constants C_i defined in G&M (2020)
+- `obstmax::T` : The maximum observation time of integration for transit timing.
 
 One example for a four-planet system:
 ```
-OrbitParameters(4,                          # The number of the planets
-                [0.5, 0.5])                # C_i factors 
+OrbitParameters(4,              # The number of the planets
+                [0.5, 0.5],     # C_i factors 
+                2123)           # Total time of integration for transit timing purpose
 ```
 
 Note that the length of `cfactor::Vector{T}` must be 2 elements shorter than `mass:Vector{T}`
@@ -153,12 +160,14 @@ Main constructor for Orbit object. Access states and initial conditions of the s
 - `orbparams::OrbitParameters{T}` : Orbit parameters)
 
 # Orbit object takes three arguments: number of planets, opt params, and orbit params
-orbit = Orbit(4, optparams, orbparams)
+orbit = Orbit(3, optparams, orbparams)
 ```
 
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively. 
 The Jacobians of the optimization can be called from fields `jac_1`, `jac_2`, `jac_3`, and `jac_combined`.
 The final orbital elements and its `State` can also be called from `Orbit` structure.
+
+Alternatively, access the initial and/or final optimization vector via `init_elem` and `final_elem`.
 """
 Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real} = begin
 
@@ -175,25 +184,25 @@ Orbit(n::Int, optparams::OptimParameters{T}, orbparams::OrbitParameters{U}) wher
     ic = CartesianIC(convert(T, 0.), n+1, permutedims(ic_mat))
     s = State(ic)
 
-    # # Export the elements for testing later
+    # Export the elements for testing later
     init_elem = extract_elements(deepcopy(s), ic, orbparams)
 
-    # # Compute derivatives (Jac 1)
+    # Compute derivatives (Jac 1)
     jac_1 = compute_derivative_system_init(optvec, orbparams)
 
-    # # Compute time evolution Jacobian (Jac 2)
+    # Compute time evolution Jacobian (Jac 2)
     jac_2, s_final = calculate_jac_time_evolution(deepcopy(s), optparams.tsys, optparams.inner_period)
 
-    # # Export the elements for testing later
+    # Export the elements for testing later
     final_elem = extract_elements(deepcopy(s_final), ic, orbparams)
 
-    # # Compute derivatives (Jac 3)
+    # Compute derivatives (Jac 3)
     jac_3 = compute_jac_final(s_final, ic, orbparams)
 
     Orbit(s, ic, optparams.kappa, jac_1, jac_2, jac_3, final_elem, s_final, init_elem)
 end
 
-"""Calculate periods, mean anomalies, and longitudes of periastron based on optvec (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
+"""Calculate periods, mean anomalies, and longitudes of periastron based on "optimization vector" `optvec::Vector{T}` (a plain, vectorized version of OptimParameters object). These quantities will be used to initialize the `Orbit` structure."""
 function compute_system_init(optvec::Vector{T}, orbparams::OrbitParameters{U}) where {T <: Real, U <: Real}
 
     n = orbparams.nplanet
@@ -316,7 +325,7 @@ function extract_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}, orbpara
     end
 end
 
-# Allow calling the function using `State` and `ic` instead of Cartesians
+"""Allow calling the function using `State` and `ic` instead of Cartesians"""
 extract_elements(s::State{T}, ic::InitialConditions{T}, orbparams::OrbitParameters{T}) where T <: Real = extract_elements(s.x, s.v, ic.m, orbparams)
 
 """Compute Jacobian 3 (Cartesians back to orbital elements)"""
@@ -337,7 +346,7 @@ function compute_jac_final(s::State{T}, ic::InitialConditions{T}, orbparams::Orb
     return J
 end
 
-
+"""Pretty display for `Orbit` structure"""
 Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     println("Orbit")
     println("Number of planets: $(o.ic.nbody-1)")
@@ -346,7 +355,7 @@ Base.show(io::IO,::MIME"text/plain",o::Orbit{T}) where {T} = begin
     return
 end
 
-"""Calculates t0 offset to correct initialization on the x-axis"""
+"""(DEPRECATED) Calculates t0 offset to correct initialization on the x-axis"""
 function M2t0(target_M::T, e::T, P::T, ω::T) where T <: Real
     # Offsetting true anomaly
     f = ω + pi/2
@@ -366,9 +375,19 @@ end
 
 # ========
 # Transit Timing Variation
+#
+# These functions are for transit timing calculation
 # ========
 
-"""Compute transit timing"""
+"""
+    compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
+
+Integrate the system specify by `cartIC` to time `tmax` and return `TransitTiming` structure from `NbodyGradient`
+
+# Arguments
+- `cartIC::CartesianIC{T}` : Cartesian initial condition for the system, defined in `NbodyGradient`
+- `tmax::T` : The time of integration for transit timing calculation
+"""
 function compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
     tt = TransitTiming(tmax, cartIC)
 
@@ -386,6 +405,15 @@ function compute_tt(cartIC::CartesianIC{T}, tmax::T) where T <: Real
     return tt
 end
 
+"""
+    compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
+
+Integrate the system specify by `orbit` to time `tmax` and return `TransitTiming` structure from `NbodyGradient`
+
+# Arguments
+- `orbit::Orbit{T}` : The `Orbit` stucture of the system we wish to integrate.
+- `tmax::T` : The time of integration for transit timing calculation.
+"""
 function compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
     tt = TransitTiming(tmax, orbit.ic)
 
@@ -401,6 +429,23 @@ function compute_tt(orbit::Orbit{T}, tmax::T) where T <: Real
     return tt
 end
 
+"""
+    match_transits(data::Matrix{T}, orbit::Orbit{T}, tt::Matrix{T}, count::Vector{Int64}, ntt) where T <: Real
+
+Match the calculated transit timings with the observed transit timings
+
+# Arguments
+- `data::Matrix{T}` : The observed transit timing data with columns: transit body, transit number, time of transit, transit uncertainty. The transit body and transit number are 1-indexed.
+- `orbit::Orbit{T}` : The orbit that was used to calculate transit time.
+- `tt::Matrix{T}` : `TransitTiming` structure for the calculated transit time from `compute_tt` method.
+- `count::Vector{T}` : Transit counts of each body
+- `ntt` : Number of transit row cutoff. Pass the argument as `nothing` to use the entire observed data.
+
+# Returns
+- `tmod::Vector` : The time of matched transit of the models.
+- `ip::Vector` : The 0-indexed transit bodys corresponding to the matched transit times.
+- `jp::Vector` : The 0-indexed transit numbers corresponding to the matched transit times.
+"""
 function match_transits(data::Matrix{T}, orbit::Orbit{T}, tt::Matrix{T}, count::Vector{Int64}, ntt) where T <: Real
     ntransit = ntt === nothing ? size(data)[1] : ntt
     ip = zeros(Int64,ntransit)
@@ -455,7 +500,9 @@ function compute_tt_jacobians(orbit::Orbit{T}, orbparams::OrbitParameters{T}, ca
     return permutedims(reduce(hcat, [reshape(raw_tt[i], :) for i = 1:ntransit]))
 end
 
-"""Temporary TransitTiming structure"""
+"""
+An extension of `TransitTiming` constructor from `NbodyGradient`. This constructor allow compatibility with `CartesianIC`.
+"""
 function TransitTiming(tmax::T,ic::CartesianIC{T},ti::Int64=1) where T<:AbstractFloat
     n = ic.nbody
     temp_state = State(ic)
