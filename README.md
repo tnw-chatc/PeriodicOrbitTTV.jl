@@ -1,9 +1,16 @@
-# PeriodicOrbit.jl
-Julia routine to search for periodic orbit built on [NbodyGradient.jl](https://github.com/ericagol/NbodyGradient.jl). This routine searches for a stable periodic orbit with heliocentric orbital elements, with support for transit timing constraints. The optimization is implemented using the Levenberg-Marquardt method, and fast, accurate Jacobians are computed using Automatic Differentiation.
+# PeriodicOrbitTTV.jl
+Julia routine to fit a planetary system built on [NbodyGradient.jl](https://github.com/ericagol/NbodyGradient.jl). This routine searches for a stable periodic orbit with heliocentric orbital elements, with support for transit timing constraints. The optimization is implemented using the Levenberg-Marquardt method, and fast, accurate Jacobians are computed using Automatic Differentiation.
 
 Under development by Tanawan Chatchadanoraset, Hurum Tohfa, and Eric Agol
 
-`PeriodicOrbit.jl` is the implementation of Chatchadanoraset, Tohfa & Agol (2025)
+`PeriodicOrbitTTV.jl` is the Julia implementation of Chatchadanoraset, Tohfa & Agol (2025)
+
+## Installation
+
+Clone this repository to your local machine
+```
+Pkg.add(url="https://github.com/tnw-chatc/PeriodicOrbitTTV.jl.git")
+```
 
 ## Getting Started
 
@@ -56,7 +63,7 @@ find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
     prior_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 ```
-to perform the optimization. See its documentations for more information.
+to perform the optimization. See the documentation for more information.
 
 ## Optimize with Transit Timing constraint
 
@@ -67,7 +74,10 @@ find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
     prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
 ```
-to perform the optimization, taking TT constraint into account.
+to perform the optimization, taking the transit timing constraint into account. The optimization (periodic orbit) weight is defined as $w_i = 1/\sigma_i^2$, where $\sigma_i^2$ is the variance of optimization parameter $i$.
+
+### Transit Timing Data
+`tt_data` must be a matrix with `N` rows and 4 columns consisting of the transiting body, the transit number, the transit time, and the timing uncertainty, in this order. An example matrix can be found in the repository.
 
 ## Citation
 
