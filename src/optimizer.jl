@@ -23,6 +23,10 @@ Find a periodic configuration that is periodic. Return the final parameter vecto
 - `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
 - `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
 - `scale_factor::Float64` : The scale factor to help the optimization perform better. The lenght must equal `5*nplanet+1`. Each element should have the same order of magnitude as the corresponding element of the optimization vector.
+
+# Returns
+- `fit::LsqFitResult` : The results of the optimization from `LsqFit.jl`
+- `scale_factor::Vector` : The scale factor used in the optimization
 """ 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
@@ -144,7 +148,31 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     return fit, scale_factor
 end
 
-"""Routine for finding PO with a TT constraint"""
+"""
+    find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}; use_jac=false, verbose=false) where T <: Real
+
+Find a periodic configuration that is periodic with transit timing constraints. Return the final parameter vector as `OptimParameters`.
+
+# Arguments
+- `optparams::OptimParameters{T}` : The optimization parameters. See its constructor's docstring.
+- `orbparams::OrbitParameters{T}` : The orbit parameters. These parameters are static during the entire optimizations. See its constructor's docstring.
+- `tt_data::Matrix{T}` : The transit timing data with columns: transit body, transit number, time of transit, transit uncertainty. The transit body and transit number are 1-indexed.
+
+# Optionals
+- `use_jac::Bool` : Calculate and use Jacobians for optimization. True by Default.
+- `trace::Bool` : Show optimizer trace. False by default.
+- `eccmin::T` : The lower bounds for eccentricities
+- `maxit::Int64` : Maximum optimizer iterations
+- `optim_weights::Float64` : The weights of the optimization parameters. The length must equal `4*nplanet-2`
+- `prior_weights::Float64` : The weight of priors. Default to 1e8 for masses, kappa, and ω1. The lenght must equal `5*nplanet+1`
+- `lower_bounds::Float64` : The lower bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `upper_bounds::Float64` : The upper bounds of the optimization. The lenght must equal `5*nplanet+1`
+- `scale_factor::Float64` : The scale factor to help the optimization perform better. The lenght must equal `5*nplanet+1`. Each element should have the same order of magnitude as the corresponding element of the optimization vector.
+
+# Returns
+- `fit::LsqFitResult` : The results of the optimization from `LsqFit.jl`
+- `scale_factor::Vector` : The scale factor used in the optimization
+""" 
 function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}; 
     use_jac::Bool=true, trace::Bool=false,eccmin::T=1e-3,maxit::Int64=1000, optim_weights=nothing,
     prior_weights=nothing, tt_weights=nothing, lower_bounds=nothing, upper_bounds=nothing, scale_factor=nothing) where T <: Real
@@ -288,6 +316,10 @@ function find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitPara
     return fit, scale_factor
 end
 
+# TODO: The name of the function is a misnomer. It only computes the diff (NOT squared, as it will be handled by LsqFit.jl)
+"""
+Calculate the difference in GM20 (X) parameters, with priors attach at the end.
+"""
 function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
     
@@ -302,12 +334,18 @@ function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitPar
     return [diff; priors]
 end
 
+"""
+Calculate the difference in GM20 (X) parameters, with priors attach at the end, including transit timing data.
+"""
 function compute_diff_squared(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, ttmod::Vector{T}) where T <: Real
     obj_vec = compute_diff_squared(optparams, orbparams, nplanet)
 
     return [obj_vec; ttmod]
 end
 
+"""
+Calculate Jacobians for `compute_diff_squared`
+"""
 function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int) where T <: Real
     orbit = Orbit(nplanet, optparams, orbparams)
 
@@ -324,6 +362,9 @@ function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams:
     return [diff_jac; Matrix{T}(I, 5*nplanet+1, 5*nplanet+1)]
 end
 
+"""
+Calculate Jacobians for `compute_diff_squared`
+"""
 function compute_diff_squared_jacobian(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, nplanet::Int, tt_data::Matrix{T}) where T <: Real
     obj_jac = compute_diff_squared_jacobian(optparams, orbparams, nplanet)
 
