@@ -159,9 +159,7 @@ Main constructor for Orbit object. Access states and initial conditions of the s
 - `optparams::OptimParameters{T}` : Optimization parameters
 - `orbparams::OrbitParameters{T}` : Orbit parameters)
 
-# Orbit object takes three arguments: number of planets, opt params, and orbit params
-orbit = Orbit(3, optparams, orbparams)
-```
+Orbit object takes three arguments: number of planets, opt params, and orbit params
 
 Access `State` and `InitialConditions` using `orbit.s` and `orbit.ic`, respectively. 
 The Jacobians of the optimization can be called from fields `jac_1`, `jac_2`, `jac_3`, and `jac_combined`.
