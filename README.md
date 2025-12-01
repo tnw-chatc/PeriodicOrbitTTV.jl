@@ -3,7 +3,7 @@ Julia routine to fit a planetary system built on [NbodyGradient.jl](https://gith
 
 Under development by Tanawan Chatchadanoraset, Hurum Tohfa, and Eric Agol
 
-`PeriodicOrbitTTV.jl` is the Julia implementation of Chatchadanoraset, Tohfa & Agol (2025)
+`PeriodicOrbitTTV.jl` is the Julia implementation of Chatchadanoraset, Tohfa, Agol & Lindor (2025)
 
 ## Installation
 
@@ -81,4 +81,4 @@ to perform the optimization, taking the transit timing constraint into account. 
 
 ## Citation
 
-...
+(To be updated)
