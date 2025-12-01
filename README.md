@@ -14,7 +14,7 @@ Pkg.add(url="https://github.com/tnw-chatc/PeriodicOrbitTTV.jl.git")
 
 ## Getting Started
 
-Most of the time, the information of the system is encoded in an `Orbit` structure, which we will use to perform various operations.
+The information of the system is encoded in an `Orbit` structure, which we will use to perform various operations.
 
 To construct an `Orbit` structure, you will need
 1. `OptimParatemers` : the set of optimization parameters.
