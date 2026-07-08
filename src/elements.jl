@@ -165,11 +165,13 @@ Calculate Jacobi orbital elements from cartesian positions and velocities.
 """
 function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; time=0.) where T <: Real
     elems = RealElements[]
-    μs = get_relative_Jacobi_masses(masses)
+    μs = convert(Vector{T}, get_relative_Jacobi_masses(masses))
     n = length(masses)
-    Hmat = hierarchy([n, ones(Int64,n-1)...])
+    Hmat = convert(Matrix{T}, hierarchy([n, ones(Int64,n-1)...]))
     amat = NbodyGradient.amatrix(Hmat, masses)
     X, V = get_relative_Jacobi_positions(x, v, n, amat)
+    X = convert.(T, X)
+    V = convert.(T, V)
 
     push!(elems, RealElements(masses[1]))  # Central body
     i = 1; b = 0
