@@ -1,5 +1,5 @@
 module PeriodicOrbitTTV
-__precompile__(false)
+# __precompile__(false)
 
 using Rotations
 using LinearAlgebra
