@@ -16,6 +16,8 @@ using LinearAlgebra
 
 """
 Convert relative Cartesian positions and velocities to orbital elements.
+
+From Murray & Dermott
 """
 function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <: Real
     R = norm(x)
@@ -50,8 +52,6 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
         ω_plus_f = atan(x[2], x[1])
     end
 
-    # ω_plus_f = atan(x[2], x[1])
-
     # (2.139) assuming Rdot = (x.v)/R which is projection of velocity in radial direction
     sinf = a * (1 - e^2) * dot(x, v) / (h * e * R)
     cosf = (1 / e) * (a * (1 - e^2) / R - 1)
@@ -79,7 +79,6 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     #  τ from M and n (Eq. 2.51 rearranged)
     τ = t - M / n_mean
 
-
     return (
         a = a,
         e = e,
@@ -95,7 +94,7 @@ function convert_to_elements(x::Vector{T}, v::Vector{T}, Gm::T, t::T) where T <:
     )
 end
 
-# Return Jacobi relative masses if passed with an IC instead of mass vector
+"""Return Jacobi relative masses if passed with an IC instead of mass vector"""
 function get_relative_Jacobi_masses(masses::Vector{T}) where T <: Real
     N = length(masses)
     M = zeros(N-1)
@@ -103,7 +102,8 @@ function get_relative_Jacobi_masses(masses::Vector{T}) where T <: Real
     Hmat = hierarchy([N, ones(Int64,N-1)...])
     for i in 1:N-1
         for j in 1:N
-            # TODO: Make this line compatible with ForwardDiff
+            # TODO: Make this line compatible with ForwardDiff, but we are not using this now
+            # since we are working with astrocentric coords in the optimization process.
             M[i] += abs(Hmat[i,j])*masses[j]
         end
     end
@@ -155,7 +155,7 @@ struct RealElements{T <: Real}
     tp::T
 end
 
-# TODO: Quality of life improvement: Implement fancy showing of the elements
+# NOTE: Quality of life improvement: Implement fancy showing of the elements
 
 # Special function for the primary body
 RealElements(m::T) where T <: Real = RealElements(m, zeros(T, 10)...)
@@ -180,7 +180,6 @@ function get_Jacobi_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{
             b += 1
         end
         a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[:,i+b], V[:,i+b], μs[i+b], convert(T, time))
-        # TODO: Make sure if these conversions are a good thing to do...?
         push!(elems, RealElements(masses[i+1], 2π / n, convert(T, 0.0), e*cos(ω), e*sin(ω), I, convert(T, Ω), a, e, ω, τ))
         if b > 0
             b -= 2
@@ -214,7 +213,6 @@ function get_orbital_elements(x::Matrix{T}, v::Matrix{T}, masses::Vector{T}; tim
             b += 1
         end
         a, e, I, Ω, ω, f, M, E, τ, n, h = convert_to_elements(X[:,i+b], V[:,i+b], μs[i+b], convert(T, time))
-        # TODO: Make sure if these conversions are a good thing to do...?
         push!(elems, RealElements(masses[i+1], 2π / n, convert(T, 0.0), e*cos(ω), e*sin(ω), I, convert(T, Ω), a, e, ω, τ))
         if b > 0
             b -= 2
