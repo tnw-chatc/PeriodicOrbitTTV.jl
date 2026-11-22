@@ -1,9 +1,9 @@
 # PeriodicOrbitTTV.jl
-Julia routine to fit a planetary system built on [NbodyGradient.jl](https://github.com/ericagol/NbodyGradient.jl). This routine searches for a stable periodic orbit with heliocentric orbital elements, with support for transit timing constraints. The optimization is implemented using the Levenberg-Marquardt method, and fast, accurate Jacobians are computed using Automatic Differentiation.
+Julia routine to fit a planetary system built on [NbodyGradient.jl](https://github.com/ericagol/NbodyGradient.jl). This routine searches for a stable periodic orbit with astrocetric orbital elements, with support for transit timing constraints. The optimization is implemented using the Levenberg-Marquardt method, and fast, accurate Jacobians are computed using Automatic Differentiation.
 
-Under development by Tanawan Chatchadanoraset, Hurum Tohfa, and Eric Agol
+Under development by Tanawan Chatchadanoraset, Hurum Tohfa, and Eric Agol.
 
-`PeriodicOrbitTTV.jl` is the Julia implementation of Chatchadanoraset, Tohfa, Agol & Lindor (2025)
+`PeriodicOrbitTTV.jl` is the Julia implementation of Chatchadanoraset, Agol, Tohfa, Lindor, and Goździewski (2026)
 
 ## Installation
 
@@ -48,7 +48,7 @@ Another way to construct `OptimParameters` is to use its default constructor `Op
 
 `OrbitParameters` consists of parameters that do not change during the optimization. It consists of 
 1. The number of the _planets_,
-2. The `C` factors defined in CTA25. Only applicable for a system with 3 or more planets.
+2. The `C` factors defined in equation 3 in Chatchadanoraset+26. Only applicable for systems with 3 or more planets.
 3. The maximum observation time for transit timing.
 
 ### `Orbit`
@@ -67,7 +67,7 @@ to perform the optimization. See the documentation for more information.
 
 ## Optimize with Transit Timing constraint
 
-`PeriodicOrbit.jl` allows transit timing constraint, thanks to its compatibility with `NbodyGradient.jl`. Simply load the TT information and call
+`PeriodicOrbit.jl` allows transit timing constraints, thanks to its compatibility with `NbodyGradient.jl`. Simply load the TT information and call
 
 ```julia
 find_periodic_orbit(optparams::OptimParameters{T}, orbparams::OrbitParameters{T}, tt_data::Matrix{T}; 
@@ -79,6 +79,10 @@ to perform the optimization, taking the transit timing constraint into account. 
 ### Transit Timing Data
 `tt_data` must be a matrix with `N` rows and 4 columns consisting of the transiting body, the transit number, the transit time, and the timing uncertainty, in this order. An example matrix can be found in the repository.
 
+# Bare-bone Approach
+
+If one wants more control and flexibility, one can also write the entire routine from scratch, and the autodiffed Jacobians can be easily called using the method `compute_diff_squared_jacobian`. See `examples/freq_multi_noise_all_01_03s.jl` for an example of how to perform optimization without calling a convenience function `find_periodic_orbit`.
+
 ## Citation
 
-(To be updated)
+If you use this routine in research or publications, please consider citing ... (To be updated)
